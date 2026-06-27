@@ -1,0 +1,24 @@
+symbolPreset: ascii
+theme: 
+  dark: titanium
+  light: light
+setupVersion: 1
+modelRoles: 
+  default: opencode-go/deepseek-v4-flash:xhigh
+  advisor: opencode-go/deepseek-v4-flash:high
+  smol: opencode-go/deepseek-v4-flash:xhigh
+colorBlindMode: false
+display: 
+  showTokenUsage: true
+steeringMode: one-at-a-time
+compaction: 
+  enabled: false
+autolearn: 
+  enabled: false
+edit: 
+  mode: hashline
+bash: 
+  autoBackground: 
+    enabled: false
+checkpoint: 
+  enabled: true
