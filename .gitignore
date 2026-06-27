@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+*.tsbuildinfo
+dist/
+.env
+pi-backup (old)/
+extension/

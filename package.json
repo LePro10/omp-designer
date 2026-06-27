@@ -1,0 +1,42 @@
+{
+  "name": "omp-designer",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Designer Mode for Pi — toggleable UI/UX design workflow with 5 specialized skills, 161 color palettes, 57 font pairings, and 4 MCP integrations",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "design",
+    "ui",
+    "ux",
+    "design-system",
+    "animation",
+    "frontend",
+    "color-palette",
+    "typography",
+    "anti-slop"
+  ],
+  "author": "Leandro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/leandro/omp-designer"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"],
+    "image": "https://pi.dev/logo-auto.svg"
+  },
+  "omp": {
+    "extensions": ["./extension/index.ts"]
+  },
+  "files": [
+    "extensions/",
+    "skills/",
+    "data/",
+    "docs/",
+    "AGENTS.md",
+    "architecture.md",
+    "package.json"
+  ]
+}
