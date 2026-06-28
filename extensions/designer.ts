@@ -84,6 +84,31 @@ function setDesignerMcpEnabled(enabled: boolean): void {
   } catch { /* mcp.json broken/missing — no crash */ }
 }
 
+
+/** Check mcp.json for placeholder API keys. Returns names of servers with missing keys. */
+function getMissingMcpKeys(): string[] {
+  const missing: string[] = [];
+  try {
+    if (!existsSync(MCP_CONFIG)) return ["mcp.json not found"];
+    const raw = JSON.parse(readFileSync(MCP_CONFIG, "utf-8")) as Record<string, unknown>;
+    const servers = raw.mcpServers as Record<string, Record<string, unknown>> | undefined;
+    if (!servers) return [];
+    const checks: [string, string, string][] = [
+      ["21st-dev-magic", "API_KEY", "21st.dev API key (free at https://21st.dev/studio)"],
+      ["designmd", "DESIGNMD_API_KEY", "designmd API key (optional, https://designmd.ai/api-keys)"],
+    ];
+    for (const [name, envKey, label] of checks) {
+      const srv = servers[name];
+      if (!srv) continue;
+      const env = (srv.env ?? {}) as Record<string, string>;
+      const val = env[envKey] ?? "";
+      if (!val || val.includes("YOUR_") || val === "sk-") {
+        missing.push(label);
+      }
+    }
+  } catch { /* silently ignore parse errors */ }
+  return missing;
+}
 function syncMcpConfigOnStartup(): void {
   setDesignerMcpEnabled(isOn());
 }
@@ -165,6 +190,17 @@ export default function designerExtension(pi: ExtensionAPI): void {
       setDesignerMcpEnabled(nextState);
 
       if (nextState) {
+
+        // Check for missing API keys on first activation
+        if (!wasOn) {
+          const missing = getMissingMcpKeys();
+          if (missing.length > 0) {
+            ctx.ui.notify(
+              "MCP keys missing: " + missing.join(", ") + ". See AGENTS.md or /designer setup.",
+              "warn"
+            );
+          }
+        }
         ctx.ui.notify(
           "DESIGNER MODE ON — workflow active, design MCPs enabled. Run /reload to activate MCPs.",
           "info"
