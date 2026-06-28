@@ -136,8 +136,11 @@ function buildPrompt(): string {
   "New project" = any request for a site, page, section, or component that doesn't exist yet.
 - **Subagents have NO designer context.** They get a fresh system prompt with zero skills.
   Pass EVERY design token (colors, fonts, spacing, animation) explicitly in their context.
-- **Plan approval via resolve tool.** Keeps everything in one turn — no context lost.
-- **Plan files in local://<name>.md.** They persist across turns.
+- **Plan approval:** Use the `resolve` tool if available. If not (Pi default), ask the user directly in chat — same result.
+- **Plan files:** Use `local://<name>.md` if available. If not (Pi default), use `write` to create a regular .md file.
+- **Missing tools (Pi only):** `web_search`, `generate_image`, `task` subagents are NOT available on default Pi.
+  Fallbacks: use logo_search (21st-dev) for SVGs, placeholder text for images, sequential builds instead of parallel.
+  The core workflow works fine without these — palette selection, code generation, and review are unaffected.
 
 ## Workflow
 The authoritative workflow lives in the **designer-master skill** — READ it as STEP 1.

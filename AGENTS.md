@@ -8,9 +8,39 @@
 
 ## What this is
 
-`omp-designer` is a toggleable `/designer` extension for Pi and oh-my-pi that loads
+`omp-designer` is a toggleable `/designer` extension for [Pi](https://pi.dev) and [oh-my-pi](https://github.com/can1357/oh-my-pi) that loads
 5 design skills + 4 MCP integrations. It turns any coding agent into a UI/UX design
 specialist with anti-AI-slop enforcement.
+
+## Step 0: Check prerequisites
+
+Before installing, verify the user's agent has the tools the designer workflow needs.
+
+### Pi users (pi.dev)
+
+Pi ships with only `read`, `write`, `edit`, `bash` by default. The designer workflow uses these additional tools:
+
+| Tool | Used for | Status |
+|------|----------|--------|
+| `search_tool_bm25` | MCP tool discovery | ✅ Built-in |
+| `web_search` | Looking up design references, motion.dev examples | ❌ Needs extension |
+| `generate_image` | Hero images, visual assets | ❌ Needs extension |
+| `task` / subagents | Parallel component building | ❌ Needs extension |
+| `resolve` | Plan approval in one turn | ❌ omp-only, fallback to manual approval |
+| `local://` URIs | Plan file persistence | ❌ omp-only, fallback to `write` |
+
+**If the user is on Pi, ASK:** "Pi only has 4 built-in tools. The designer workflow works best with web_search, task/subagents, and generate_image. Should I install community extensions for these?"
+
+Recommended Pi extensions:
+- Subagents: `pi install git:github.com/tintinweb/pi-subagents`
+- Web search: `pi install npm:@anthropic/pi-web-search` (or check pi.dev/packages)
+- Image generation: check pi.dev/packages for a `generate_image` extension
+
+**If the user says no, that's fine.** The core designer workflow (palette selection, code generation, review) still works without them. The skills have built-in fallbacks for missing tools.
+
+### omp users (oh-my-pi)
+
+omp ships with 15+ tools including `web_search`, `generate_image`, `task`, `resolve`, `local://`. No extra setup needed beyond MCP configuration.
 
 ## Step 1: Install
 
@@ -104,7 +134,6 @@ If NO → skip. designmd is entirely optional.
 
 Tell the user: "For best design results, use MiniMax M3. It has the best design taste and follows anti-slop rules most consistently."
 
-
 Pi (`~/.pi/agent/config.yml`):
 ```yaml
 modelRoles:
@@ -175,6 +204,13 @@ omp-designer/
 - Check the model: small/fast models ignore design rules. Switch to MiniMax M3 or Claude Opus.
 - Check that skills are loaded: run `/reload` and look for skill names in startup output
 - Verify the system prompt injection is working — look for "[DESIGNER MODE v2: ACTIVE]" in context
+
+**Missing tools on Pi (resolve, local://, generate_image)?**
+- `resolve`: agent will fall back to asking the user via chat. Slower but works.
+- `local://`: agent will fall back to writing plan files with `write` tool. Same result.
+- `generate_image`: agent will use logo_search (21st-dev) for SVGs, placeholder descriptions for photos.
+- `task`/subagents: agent will build components sequentially instead of in parallel. Slower, same quality.
+- `web_search`: agent will use known URLs and MCP tools instead of web search. No external lookups needed.
 
 ## Key URLs
 
