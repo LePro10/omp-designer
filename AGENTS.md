@@ -1,131 +1,185 @@
-# /designer System — AI Agent Context
+# AGENTS.md — AI Onboarding for omp-designer
 
-> This file is the entry point. Read this first before touching any code.
-> Project root: `/home/leandro/projects/projects/designer`
-
----
-
-## TL;DR
-
-`/designer` v2 is a toggleable command for **oh-my-pi** (`omp`) that turns the AI
-into a UI/UX design specialist. When ON, 3 skills are loaded into context,
-four MCP servers are available, and a structured 8-step workflow is enforced.
-When OFF, everything is hidden — agent returns to normal coding mode.
-
-## CRITICAL CONTEXT RULES
-
-- **No /plan.** No plan-mode. No read-only mode switching. Designer mode stays
-  ON for the entire project (plan + implement + review).
-- **Context persists** because `before_agent_start` fires on every user message,
-  re-injecting PROMPT_INJECT + all 5 skills. Mode switching would destroy this.
-- **Subagents have NO designer context.** Pass every design token explicitly.
-- **Plan approval via `resolve`** keeps everything in one turn.
-- **`local://` plan files** persist across turns.
+> **If you're an AI agent and someone shared this repo with you:** follow this file exactly.
+> It contains the complete install → configure → verify workflow.
+> Ask the user for missing information. Never guess API keys.
 
 ---
 
-## Your Job
+## What this is
 
-The system works but needs refinement. High-priority problems:
+`omp-designer` is a toggleable `/designer` extension for Pi and oh-my-pi that loads
+5 design skills + 4 MCP integrations. It turns any coding agent into a UI/UX design
+specialist with anti-AI-slop enforcement.
 
-1. **Model quality** — `deepseek-v4-flash` produces AI slop regardless of rules.
-   Change `~/.omp/agent/config.yml` default model to `kimi-k2.6`.
-2. **Plan from skills** — When a plan is pre-injected, the agent validates it
-   instead of building a fresh plan from skills. The prompt says "IGNORE plans"
-   but doesn't enforce it.
-3. **CSVs not read** — `ui-ux-pro-max-skill` has 161 palettes in CSV files.
-   The agent almost never reads them despite explicit instructions.
-   (CSV data at `src/ui-ux-pro-max/data/` — NOT `src/data/`)
-4. **Taste skill too large** — 87 KB is a massive context hit. Consider trimming.
-5. **Animation/Skill-compliance audit** — The `designer-master` skill mentions it
-   but `review-skill` was simplified to functional checks only. Reconcile.
-6. **Tool name mismatch** — `21st_magic_logo_search` doesn't exist. Real tool is
-   `logo_search`. Also `21st_magic_component_refiner` exists but undocumented.
-7. **MCP tool discovery** — 21st-dev tools need `search_tool_bm25` to activate.
-   Not automatically available.
+## Step 1: Install
 
----
-
-## Quickstart
+Pi or omp must be installed first.
 
 ```bash
-source ~/.bashrc
-omp                           # start omp
-/designer                     # toggle ON — skills + MCPs loaded
-/designer                     # toggle OFF — everything hidden
+# For Pi (pi.dev):
+pi install npm:omp-designer
+
+# For oh-my-pi (omp):
+omp install npm:omp-designer
 ```
 
-### After changes to the extension:
-```bash
-omp --extension ~/.omp/agent/extensions/designer/index.ts --print "hello"
-tail -5 ~/.omp/logs/omp.$(date +%Y-%m-%d).log | grep -E "(error|Failed)" || echo "OK"
-```
+If the user doesn't have Pi or omp installed:
+- Pi: `curl -fsSL https://pi.dev/install.sh | sh`
+- omp: follow https://github.com/can1357/oh-my-pi
 
----
+Verify: ask the user to type `/designer` in their agent. They should see "DESIGNER MODE ON".
 
-## Project Structure
+## Step 2: Configure MCP servers
 
-```
-/home/leandro/projects/projects/designer/
-├── AGENTS.md                    ← YOU ARE HERE
-├── architecture.md              → System architecture overview
-├── docs/
-│   ├── extension-api.md         → omp extension API rules
-│   ├── problems.md              → Known bugs & todos
-│   └── mcp-setup.md             → MCP server documentation
-├── skills/
-│   ├── designer-master.md       → Orchestrator workflow
-│   ├── taste-skill.md           → Anti-Slop Taste Skill (tasteskill.dev)
-│   ├── animate.md               → Emil Kowalski animation patterns
-│   ├── ui-ux-pro-max.md         → Design intelligence database
-│   └── review-skill.md          → Post-review pipeline
-└── extension/
-    └── index.ts                 → Copy of the /designer extension code
-```
+This package uses 4 MCP servers. Two are free, two need API keys.
 
-### Important system paths (not in this project):
-```
-~/.omp/agent/extensions/designer/index.ts     → LIVE extension (edit this)
-~/.omp/agent/extensions/designer/package.json
-~/.omp/agent/managed-skills/*/SKILL.md        → LIVE skills (edit these)
-~/.omp/agent/mcp.json                         → MCP config
-~/.omp/agent/config.yml                       → Model roles & settings
-~/.omp/agent/designer-state.json              → ON/OFF state
-~/.cache/puppeteer/chrome/linux-149.0.7827.22/chrome-linux64/chrome → Chrome binary
-```
+### ASK THE USER these questions (one at a time):
 
-Make changes to files in `~/.omp/agent/` — the project here contains docs only.
+**Question 1:** "Do you have a 21st.dev API key? Get a free one at https://21st.dev/studio — it enables SVG logo search and component patterns."
 
----
-
-## Key Architecture Rules
-
-- **Factory function required:** `export default function (pi: any) { ... }`
-- **Never `export default { ... }`** — omp crashes with "not a valid factory function"
-- **Never `return {}`** from handlers — use `return;` instead
-- **`before_agent_start`:** use `systemPrompt` (not `message`) — `message` crashes (`h.content undefined`)
-- **`resources_discover`:** returns `{ skillPaths: string[] }` or `undefined`
-- **State persistence:** file-based (`designer-state.json`) not `appendEntry`
-
----
-
-## Extension Code (`~/.omp/agent/extensions/designer/index.ts`)
-
-Three hooks:
-1. **`registerCommand("designer", ...)`** — toggles ON/OFF via file state
-2. **`resources_discover`** — returns 5 skill paths when ON
-3. **`before_agent_start`** — appends `PROMPT_INJECT` (2 KB) to system prompt when ON
-
-The `PROMPT_INJECT` string defines the 7-step workflow the agent must follow.
-It also lists anti-AI-slop color rules and available MCP tools.
-
----
-
-## Shell Integration
-
-```bash
-# ~/.bashrc and ~/.zshrc:
-omp() {
-  command omp --extension "$HOME/.omp/agent/extensions/designer/index.ts" "$@"
+If YES → add to `~/.pi/agent/mcp.json` or `~/.omp/agent/mcp.json`:
+```json
+"21st-dev-magic": {
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@21st-dev/magic@latest"],
+  "env": { "API_KEY": "<their-key>" },
+  "enabled": false
 }
 ```
+
+If NO → skip. 21st-dev is optional. The agent will use ui-layouts + hand-crafted components instead.
+
+**Question 2:** "Do you have a designmd API key? Get one at https://designmd.ai/api-keys — it provides design system references."
+
+If YES → add:
+```json
+"designmd": {
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "designmd-mcp@latest"],
+  "env": { "DESIGNMD_API_KEY": "<their-key>" },
+  "enabled": false
+}
+```
+
+If NO → skip. designmd is entirely optional.
+
+**No questions needed for these (auto-configure):**
+
+```json
+"chrome-devtools": {
+  "type": "stdio",
+  "command": "npx",
+  "args": [
+    "-y", "chrome-devtools-mcp@latest",
+    "--isolated", "--headless",
+    "--no-usage-statistics", "--no-performance-crux",
+    "--chrome-arg=--no-sandbox",
+    "--chrome-arg=--disable-gpu",
+    "--chrome-arg=--disable-dev-shm-usage",
+    "--chrome-arg=--disable-logging",
+    "--chrome-arg=--log-level=3"
+  ],
+  "env": {
+    "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1",
+    "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"
+  },
+  "enabled": false
+},
+"ui-layouts": {
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@ui-layouts/mcp@latest"],
+  "enabled": false
+}
+```
+
+> **IMPORTANT:** Find the Chrome binary path. On Linux check `~/.cache/puppeteer/chrome/` or run `which google-chrome`. On macOS it's `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`. Add `"--executable-path"` to chrome-devtools args if not auto-detected.
+
+> **Chrome log spam:** The `--disable-logging --log-level=3` args suppress harmless Chrome internal errors (`fallback_task_provider.cc`, `extension_web_request_event_router.cc`).
+
+## Step 3: Recommend model
+
+Tell the user: "For best design results, set your default model to Kimi K2.6. Smaller models produce AI-slop regardless of rules."
+
+Pi (`~/.pi/agent/config.yml`):
+```yaml
+modelRoles:
+  default: opencode-go/kimi-k2.6:high
+```
+
+omp (`~/.omp/agent/config.yml`):
+```yaml
+modelRoles:
+  default: opencode-go/kimi-k2.6:high
+```
+
+If the user prefers another model, that's fine — but warn them that small/fast models will produce more generic designs.
+
+## Step 4: Verify installation
+
+After setup, ask the user to:
+
+1. Start Pi/omp
+2. Type `/designer` → should see "DESIGNER MODE ON"
+3. Type `/designer` again → should see "DESIGNER MODE OFF"
+4. Type `/reload` (Pi) or restart (omp) to activate MCP servers
+
+## What NOT to do
+
+- NEVER guess API keys or tokens
+- NEVER hardcode the user's home directory paths — use `~` or ask
+- NEVER skip the MCP configuration step
+- NEVER modify the skill files in `skills/`
+- NEVER read full CSV files from `data/ui-ux-pro-max/` — use grep + range reads
+
+## Package structure (for reference)
+
+```
+omp-designer/
+├── extensions/designer.ts    # Pi extension (pi.dev API)
+├── extension/index.ts        # omp extension (oh-my-pi API)
+├── skills/                   # Auto-discovered design skills
+│   ├── designer-master.md    # 8-step orchestration workflow
+│   ├── taste-skill.md        # Anti-slop rules + 50-point pre-flight
+│   ├── animate.md            # Animation patterns and easing
+│   ├── ui-ux-pro-max.md      # Design intelligence instructions
+│   └── review-skill.md       # Post-build audit
+├── data/ui-ux-pro-max/       # 1.7 MB CSV design database
+│   ├── design.csv            # 161 color palettes
+│   ├── typography.csv        # 57 font pairings
+│   ├── colors.csv            # 31 KB color data
+│   ├── styles.csv            # 67 UI styles
+│   ├── ux-guidelines.csv     # 99 UX rules
+│   └── stacks/               # Per-framework configs
+├── docs/                     # Architecture, MCP setup, problems
+├── README.md                 # Human-readable install guide
+└── package.json              # Dual manifest (pi + omp)
+```
+
+## Troubleshooting
+
+**MCP servers not connecting?**
+- Run `/reload` (Pi) or restart omp
+- Check that `npx` is available: `which npx`
+- Check API keys in mcp.json are correct
+
+**Chrome errors in log?**
+- Add `--chrome-arg=--disable-logging --chrome-arg=--log-level=3` to chrome-devtools args
+- These are harmless Chromium internal messages, not from the designer package
+
+**Designer mode ON but still getting AI-slop?**
+- Check the model: small/fast models ignore design rules. Switch to Kimi K2.6 or Claude Opus
+- Check that skills are loaded: run `/reload` and look for skill names in startup output
+- Verify the system prompt injection is working — look for "[DESIGNER MODE v2: ACTIVE]" in context
+
+## Key URLs
+
+- GitHub: https://github.com/LePro10/omp-designer
+- npm: https://www.npmjs.com/package/omp-designer
+- Pi docs: https://github.com/earendil-works/pi
+- omp docs: https://github.com/can1357/oh-my-pi
+- 21st.dev API keys: https://21st.dev/studio (free tier)
+- designmd API keys: https://designmd.ai/api-keys (optional)
