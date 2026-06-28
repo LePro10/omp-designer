@@ -19,8 +19,7 @@
   "author": "Leandro",
   "license": "MIT",
   "repository": {
-    "type": "git",
-    "url": "https://github.com/leandro/omp-designer"
+    "url": "git+https://github.com/LePro10/omp-designer.git"
   },
   "pi": {
     "extensions": ["./extensions"],
