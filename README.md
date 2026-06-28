@@ -122,12 +122,12 @@ Find your Chrome binary:
 
 ## Model recommendation
 
-Per AGENTS.md: the default model should be **Kimi K2.6** for best design taste. Smaller models produce more AI-slop regardless of rules.
+For best design results, use **MiniMax M3** — it has the best design taste and follows anti-slop rules most consistently. Smaller models produce more AI-slop regardless of rules.
 
 ```yaml
 # ~/.pi/agent/config.yml (Pi) or ~/.omp/agent/config.yml (omp)
 modelRoles:
-  default: opencode-go/kimi-k2.6:high
+  default: minimax/MiniMax-M3:high
 ```
 
 ## The 8-step workflow
