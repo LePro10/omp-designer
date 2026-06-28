@@ -102,18 +102,19 @@ If NO → skip. designmd is entirely optional.
 
 ## Step 3: Recommend model
 
-Tell the user: "For best design results, set your default model to Kimi K2.6. Smaller models produce AI-slop regardless of rules."
+Tell the user: "For best design results, use MiniMax M3. It has the best design taste and follows anti-slop rules most consistently."
+
 
 Pi (`~/.pi/agent/config.yml`):
 ```yaml
 modelRoles:
-  default: opencode-go/kimi-k2.6:high
+  default: minimax/MiniMax-M3:high
 ```
 
 omp (`~/.omp/agent/config.yml`):
 ```yaml
 modelRoles:
-  default: opencode-go/kimi-k2.6:high
+  default: minimax/MiniMax-M3:high
 ```
 
 If the user prefers another model, that's fine — but warn them that small/fast models will produce more generic designs.
@@ -171,7 +172,7 @@ omp-designer/
 - These are harmless Chromium internal messages, not from the designer package
 
 **Designer mode ON but still getting AI-slop?**
-- Check the model: small/fast models ignore design rules. Switch to Kimi K2.6 or Claude Opus
+- Check the model: small/fast models ignore design rules. Switch to MiniMax M3 or Claude Opus.
 - Check that skills are loaded: run `/reload` and look for skill names in startup output
 - Verify the system prompt injection is working — look for "[DESIGNER MODE v2: ACTIVE]" in context
 
