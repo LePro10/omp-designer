@@ -44,8 +44,18 @@ Then gather information from the user. Use the `ask` tool with multiple choice o
 **Rules:**
 - Every question MUST have 3-5 multiple choice options + "Other (type your own)"
 - If the user already answered a question in their brief, do NOT ask it again
-- If the user says "surprise me" or "just build it", skip to Phase 2 with your best guesses
 - Maximum 5 questions. Do not grill forever.
+
+**Override for "surprise me":**
+If the user says "surprise me", "impress me", "just build it", or similar autonomy phrases:
+- Do NOT skip Grill Me entirely
+- Ask exactly ONE question: "What emotion should this site evoke?" with options:
+  - Awe (cinematic, dramatic, scroll storytelling)
+  - Trust (clean, professional, credible)
+  - Excitement (bold, energetic, vibrant)
+  - Calm (minimal, spacious, serene)
+  - Curiosity (experimental, unexpected, playful)
+- Document the override in PRODUCT.md
 
 ---
 
@@ -62,14 +72,24 @@ After gathering info, create a detailed plan.
 - Grep for fonts: `grep -i "keyword" data/ui-ux-pro-max/typography.csv`
 - LOCK the palette. Once chosen, use ONLY those colors.
 
-**Step 2c: Discover MCP tools**
+**Step 2c: Discover and use MCP tools**
 Run `search_tool_bm25` to find available tools: "21st-dev ui-layouts chrome-devtools designmd"
 
-Use them to find:
-- Component inspiration (21st-dev) — SHORT queries: "hero", "bento", "pricing"
-- Real React components (ui-layouts) — search_components("hero"), get_component_source_code("hero-section")
-- Reference site screenshots (chrome-devtools) — navigate_page(url), take_screenshot()
-- Design system references (designmd) — search_design_systems("saas")
+**MCP Decision Table — use the RIGHT tool for each task:**
+
+| Task | Tool | When |
+|------|------|------|
+| Find design reference for palette | designmd/search_design_systems | Before choosing colors |
+| Get implementation code for a component | ui-layouts/get_source_code | Before building a component you haven't seen |
+| Screenshot competitor/reference site | chrome-devtools/take_screenshot | During planning, to validate visual direction |
+| Find logo or icon | 21st-dev-magic/logo_search | When adding brand marks |
+| Find component inspiration | 21st-magic/component_inspiration | When designing a new section |
+
+**MCP Fallback — if search returns 0 results:**
+1. Try shorter query (1 word instead of 3): "hero" instead of "hero particle neural"
+2. Try broader category: "scroll" instead of "horizontal scroll bento"
+3. Try synonym: "card" instead of "feature tile"
+4. If still 0, note the gap and proceed without that reference. Do not assume the tool is broken.
 
 **Step 2d: Create mood board**
 Present to the user:
@@ -91,32 +111,70 @@ Show the plan to the user. End with: "Type 'accept' to build, or tell me what to
 
 **Wait for user approval.** Do NOT build until the user says "accept", "go", "build it", or similar.
 
+**Scope boundaries after approval:**
+After the user accepts, you may ONLY:
+- Improve animations (better easing, smoother transitions)
+- Improve copy (better headlines, tighter subtext)
+- Improve visual polish (better spacing, color refinement)
+
+You may NOT add:
+- New pages or sections not in the approved plan
+- New features (persistent state, custom cursors, etc.)
+- New architectural decisions
+
+If you discover something that changes the plan, PAUSE and ask: "This changes the approved plan. Continue with X instead of Y?"
+
 ---
 
 ### PHASE 3: BUILD (implement the approved plan)
 
-**Before building, read these skills:**
-- design-md/SKILL.md — how to write DESIGN.md (includes Tailwind v4 notes, motion library notes)
-- copywriting/SKILL.md — human copy rules (banned words, copy process)
-- scroll-choreography/SKILL.md — narrative motion patterns
-- animate/SKILL.md — animation patterns + easing
+**Pre-build gate — confirm you have read these skills:**
+- [ ] design-md/SKILL.md — how to write DESIGN.md
+- [ ] copywriting/SKILL.md — human copy rules
+- [ ] scroll-choreography/SKILL.md — narrative motion patterns
+- [ ] animate/SKILL.md — animation patterns + easing
+
+If any is unread, pause and read it before proceeding.
 
 **Then:**
 1. Write PRODUCT.md — capture all gathered info (see product-md/SKILL.md)
 2. Write DESIGN.md — complete visual system (see design-md/SKILL.md)
 3. Build all components following the plan
-4. Write human copy (see copywriting/SKILL.md — no buzzwords, no em-dashes)
+4. Write human copy (see copywriting/SKILL.md — no buzzwords, no em-dashes in prose)
 5. Generate 1-3 images with generate_image
 6. Run fix-ai-slop script: `node scripts/fix-ai-slop.mjs src/`
 
-**After building, read these skills:**
-- visual-critique/SKILL.md — screenshot evaluation + mobile QA checklist
-- taste-skill/SKILL.md Section 9 — AI tells checklist
+**After dependency changes:**
+If you edit package.json, restart the dev server:
+`pkill -f 'next dev' && rm -rf .next && npm install && npm run build && npm run dev`
+
+**After editing function signatures:**
+Run `npm run build` immediately to verify syntax. If build fails, revert and use `ast_edit` for structural changes.
+
+---
+
+### POST-BUILD GATE — confirm you have read these skills:
+
+- [ ] visual-critique/SKILL.md — screenshot evaluation + mobile QA checklist
+- [ ] taste-skill/SKILL.md Section 9 — AI tells checklist
+
+If any is unread, pause and read it before yielding.
 
 **Then:**
 7. Take screenshots and critique (see visual-critique/SKILL.md)
 8. Fix targeted issues (max 3 cycles)
 9. Ship — show what was actually built
+
+---
+
+## Design Vocabulary
+
+When making design decisions, think in these terms:
+- **Restraint** — using fewer elements, not more. Every element must earn its place.
+- **Hierarchy** — one dominant element per section. The eye should know where to go first.
+- **Rhythm** — alternating between dense and sparse sections. Not everything at the same density.
+- **Tension** — contrast between elements (size, color, spacing) creates interest.
+- **Release** — whitespace that gives the eye a rest. Not every pixel needs content.
 
 ---
 
@@ -154,3 +212,4 @@ For more palettes: `grep -i "keyword" data/ui-ux-pro-max/colors.csv`
 - **Fix, don't redesign.** If one section is wrong, fix that section.
 - **Ship at 8/10.** A shipped 8/10 beats a perfected 10/10.
 - **Wait for approval.** Do not build until the user says "accept".
+- **Em-dash rule:** Em-dashes are banned in prose copy (headings, body text, testimonials). Metadata titles, file paths, code comments are exempt.
