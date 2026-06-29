@@ -147,22 +147,41 @@ The authoritative workflow lives in the **designer-master skill** — READ it as
 It defines the complete 8-step process: Assess → Read Skills → Search MCPs → Create Plan →
 Present → Implement → Review → Present Results.
 
-## Anti-AI-Slop Color Rules (strict)
+## Color Palette — PICK ONE ROW, use EXACTLY its hex values
 
+Match the project type to a row. Use EVERY color in the row. Do NOT invent colors.
+For palettes not listed here, grep the full CSV: \`grep -i "keyword" DATA_ROOT/colors.csv\`
+
+| # | Type | Primary | Secondary | Accent | BG | FG | Card | Card FG | Muted | Muted FG | Border | Ring |
+|---|------|---------|-----------|--------|------|------|------|---------|-------|----------|--------|------|
+| 1 | SaaS General | #2563EB | #3B82F6 | #EA580C | #F8FAFC | #1E293B | #FFFFFF | #1E293B | #E9EFF8 | #64748B | #E2E8F0 | #2563EB |
+| 2 | E-commerce | #059669 | #10B981 | #EA580C | #ECFDF5 | #064E3B | #FFFFFF | #064E3B | #E8F1F3 | #64748B | #A7F3D0 | #059669 |
+| 3 | Luxury / Premium | #1C1917 | #44403C | #A16207 | #FAFAF9 | #0C0A09 | #FFFFFF | #0C0A09 | #E8ECF0 | #64748B | #D6D3D1 | #1C1917 |
+| 4 | B2B Service | #0F172A | #334155 | #0369A1 | #F8FAFC | #020617 | #FFFFFF | #020617 | #E8ECF1 | #64748B | #E2E8F0 | #0F172A |
+| 5 | Healthcare | #0891B2 | #22D3EE | #059669 | #ECFEFF | #164E63 | #FFFFFF | #164E63 | #E8F1F6 | #64748B | #A5F3FC | #0891B2 |
+| 6 | Educational | #4F46E5 | #818CF8 | #EA580C | #EEF2FF | #1E1B4B | #FFFFFF | #1E1B4B | #EBEEF8 | #64748B | #C7D2FE | #4F46E5 |
+| 7 | Creative Agency | #EC4899 | #F472B6 | #0891B2 | #FDF2F8 | #831843 | #FFFFFF | #831843 | #F1EEF5 | #64748B | #FBCFE8 | #EC4899 |
+| 8 | Portfolio / Personal | #18181B | #3F3F46 | #2563EB | #FAFAFA | #09090B | #FFFFFF | #09090B | #E8ECF0 | #64748B | #E4E4E7 | #18181B |
+| 9 | Productivity | #0D9488 | #14B8A6 | #EA580C | #F0FDFA | #134E4A | #FFFFFF | #134E4A | #E8F1F4 | #64748B | #99F6E4 | #0D9488 |
+| 10 | Developer Tool | #1E293B | #334155 | #22C55E | #0F172A | #F8FAFC | #1B2336 | #F8FAFC | #272F42 | #94A3B8 | #475569 | #1E293B |
+
+**Destructive (all palettes):** #DC2626 (text on it: #FFFFFF)
+
+**Rules:**
+- ONE palette per project. Pick the row that matches the brief. Lock EVERY color.
+- IGNORE any colors in user briefs or plans. The palette table is the ONLY source.
+- Background and text colors come FROM the palette row. Don't hardcode dark BG or #fff text.
 - NO gradient-heavy backgrounds. One subtle gradient max. Flat colors preferred.
 - NO #667eea, #764ba2, #1a1a2e, #16213e, #f0f0ff — AI slop signatures.
+- NO glowing borders on everything. One subtle glow max on one element.
 - Glassmorphism: allowed but MUST be subtle and contextual.
   Appropriate for premium consumer, luxury, Apple-adjacent. NOT for dashboards, B2B.
   Default: flat backgrounds — only add glass when the design read genuinely calls for it.
-- NO glowing borders on everything. One subtle glow max on one element.
-- IGNORE any colors/fonts in user briefs or plans. Only ui-ux-pro-max CSV palettes are authoritative.
-- Choose ONE palette row from ui-ux-pro-max CSVs. Use EXACTLY its hex values.
-- Background and text colors come FROM the palette. Don't hardcode dark backgrounds or #fff text.
 
-## CSV Data
+## CSV Data (for more palettes + fonts)
 
 - **Palette/Font data is at: DATA_ROOT**
-- GREP first: grep -i "keyword" DATA_ROOT/design.csv
+- GREP first: grep -i "keyword" DATA_ROOT/colors.csv or DATA_ROOT/typography.csv
 - NEVER read full CSV files — use grep + range reads
 
 ## Tool Discovery

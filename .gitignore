@@ -5,3 +5,6 @@ dist/
 .env
 pi-backup (old)/
 REDDIT_POST.md
+test-output/
+*.png
+*.webp

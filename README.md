@@ -1,6 +1,6 @@
-# omp-designer — AI-Powered UI/UX Design Mode
+# omp-designer — Autonomous AI Design System
 
-**Built natively for oh-my-pi (omp).** A toggleable `/designer` command that transforms your AI coding agent into a design specialist. Also compatible with Pi (pi.dev).
+**Built natively for oh-my-pi (omp).** A toggleable `/designer` command that transforms your AI coding agent into an autonomous design specialist. Also compatible with Pi (pi.dev).
 
 ```bash
 omp install npm:omp-designer      # oh-my-pi (native)
@@ -11,94 +11,120 @@ Then `/designer` → DESIGNER MODE ON.
 
 ---
 
-## How it works (the mental model)
+## What it does
 
-Think of the designer mode like a **film production team** packed into your AI agent:
+The agent takes a brief and produces **production-ready websites** without human design intervention. It:
 
-### The Director — designer-master
-
-The orchestrator. When you say "build me a landing page", the director takes over and runs an **8-step production**:
-
-1. **Read the room** — figures out what kind of site, for what audience, what vibe
-2. **Consult the experts** — pulls in the right design rules for this project
-3. **Scout for assets** — searches real component libraries (via MCP servers) instead of inventing from scratch
-4. **Write the brief** — picks exact colors and fonts from a database of 161 palettes
-5. **Get sign-off** — shows you the plan before writing a single line of code
-6. **Shoot** — builds everything with real components
-7. **Post-production** — 3 rounds of review: does it build? are there console errors? does it pass the 50-point checklist?
-8. **Deliver** — shows you the result with screenshots
-
-### The Art Director — taste-skill
-
-The anti-slop enforcer. This is a **78 KB rulebook** that stops the AI from producing the same generic designs every AI defaults to:
-
-- ❌ Purple gradients (`#667eea`, `#764ba2` — the "AI purple")
-- ❌ Three identical cards in a row
-- ❌ Glassmorphism on everything
-- ❌ Em-dashes in headlines
-- ❌ "Jane Doe, CEO of Acme" fake testimonials
-- ❌ Scroll cues, version labels, decorative dots...
-
-Plus a **50-point pre-flight checklist** that runs before delivery. If any box fails, the page isn't done.
-
-It also sets **3 dials** at the start of every project:
-- **Design Variance** (1 = symmetrical, 10 = artsy chaos)
-- **Motion Intensity** (1 = static, 10 = cinematic)
-- **Visual Density** (1 = airy gallery, 10 = data-dense cockpit)
-
-These dials control every decision downstream — layout, spacing, animation, everything.
-
-### The Motion Designer — animate
-
-Based on Emil Kowalski's animation course. Tells the AI exactly which easing to use, how long animations should last, and when to use CSS vs. Framer Motion vs. GSAP. No more janky `transition: all 0.3s` everywhere.
-
-### The Research Library — ui-ux-pro-max
-
-A **1.7 MB database** the AI can search:
-- 161 color palettes organized by product type (SaaS, e-commerce, portfolio, healthcare...)
-- 57 font pairings (heading + body combinations tested by designers)
-- 67 UI style definitions
-- 99 UX guidelines (accessibility, touch targets, performance, anti-patterns)
-
-Instead of the AI guessing "what colors look good together?", it greps a CSV and gets a real palette.
-
-### The QA Lead — review-skill
-
-After code is written, runs a 3-cycle audit:
-1. **Build test** — does it compile?
-2. **Browser test** — opens Chrome headless, checks console errors, takes screenshots at multiple viewport sizes
-3. **Color audit** — greps the codebase for banned AI-slop hex codes
+1. **Captures the brief** — writes PRODUCT.md with target audience, brand voice, key messages
+2. **Studies references** — visits real websites to extract design patterns
+3. **Creates a design system** — writes DESIGN.md with exact colors, typography, spacing, motion
+4. **Builds components** — 6-8 unique layout families per page, scroll animations, dark mode
+5. **Self-critiques** — takes screenshots, checks for AI tells, fixes issues
+6. **Ships** — clean TypeScript build, zero AI slop
 
 ---
 
-## How the parts fit together
+## The 9 Skills
+
+| Skill | Purpose |
+|-------|---------|
+| **designer-master** | 8-step autonomous workflow orchestrator |
+| **taste-skill** | Anti-slop rules: fake numbers, em-dashes, buzzwords, testimonial patterns |
+| **product-md** | Brief capture — persists product context across turns |
+| **design-md** | Design system spec — colors, typography, spacing, motion, components |
+| **reference-study** | Study real websites before designing |
+| **visual-critique** | Screenshot evaluation + mobile QA checklist |
+| **copywriting** | Human-sounding copy rules + examples |
+| **scroll-choreography** | Narrative motion patterns (pinned scroll, horizontal scroll, parallax) |
+| **animate** | Animation patterns, easing functions, Motion v12 integration |
+
+---
+
+## How it works
 
 ```
-You type /designer
-        │
-        ▼
-The extension writes "enabled: true" to state file
-        │
-        ▼
-On your next prompt, omp auto-injects:
-  ├── 5 skill files into the AI's context
-  ├── System prompt with anti-slop rules
-  └── CSV data path (so the AI knows where the palettes are)
-        │
-        ▼
-AI follows the 8-step director workflow:
-  Assess → Plan → Get Approval → Build → Review → Deliver
-        │
-        ▼
-MCP servers provide real tools during the workflow:
-  ui-layouts     → real React components (60+)
-  21st-dev       → SVG logos, component inspiration
-  chrome-devtools → headless browser for review
-  designmd       → design system references (optional)
-        │
-        ▼
-You type /designer again → OFF. Agent back to normal coding.
+User: "build me a landing page for my AI tool"
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│  PHASE 1: UNDERSTAND                        │
+│  • Write PRODUCT.md (brief capture)         │
+│  • Study 2-3 reference sites                │
+│  • Generate 3 design directions             │
+│  • Pick the strongest one                   │
+└─────────────────┬───────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────┐
+│  PHASE 2: DESIGN                            │
+│  • Write DESIGN.md (complete visual system) │
+│  • Choose palette from inline table (10)    │
+│  • Choose fonts from typography CSV (57)    │
+│  • Set motion system (easing, durations)    │
+└─────────────────┬───────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────┐
+│  PHASE 3: BUILD                             │
+│  • Build 6-8 unique layout families         │
+│  • Write human copy (no buzzwords)          │
+│  • Generate 1-3 key images                  │
+│  • Implement scroll choreography            │
+│  • Run fix-ai-slop.mjs (em-dash cleanup)    │
+└─────────────────┬───────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────┐
+│  PHASE 4: CRITIQUE + FIX                    │
+│  • Take desktop + mobile screenshots        │
+│  • Check hierarchy, spacing, copy, anti-slop│
+│  • Fix targeted issues (max 3 cycles)       │
+│  • Verify build passes                      │
+└─────────────────────────────────────────────┘
 ```
+
+---
+
+## Anti-Slop System
+
+The system catches AI-generated patterns at multiple levels:
+
+### Inline in PROMPT_INJECT (always active)
+- 10 curated color palettes — agent picks from table, never invents
+- Em-dash ban — "NEVER use em-dashes anywhere"
+- Fake number ban — "NEVER include percentages you invented"
+- Fake social proof ban — "NEVER mention real companies in testimonials"
+- Layout variety — "Each section uses a DIFFERENT layout family"
+- Optical typography — tracking, leading, clamp() rules
+- Dark mode rules — "deliberate design choice, not inverted colors"
+- Component patterns — 5 hero types, 4 feature types, 3 pricing types
+
+### In skills (loaded on demand)
+- taste-skill: 78KB anti-slop rulebook with 50+ rules
+- copywriting: banned words list, copy process, style references
+- scroll-choreography: narrative motion patterns
+- visual-critique: 8 mobile QA criteria, visual evaluation checklist
+
+### Post-build scripts
+- `scripts/fix-ai-slop.mjs` — automatic em-dash replacement
+- `scripts/analyze-layout.mjs` — layout variety analysis
+
+---
+
+## Test Results (13 tests, all zero AI tells)
+
+| Test | Domain | Score | Key Feature |
+|------|--------|-------|-------------|
+| Orbitask | SaaS | 9.5/10 | Pinned scroll, bento grid |
+| Luna | Portfolio | 9.5/10 | Horizontal scroll gallery, broken grid |
+| Flux | Creative Agency | 9.5/10 | Pinned horizontal scroll, 6 layouts |
+| IronPulse | Fitness | 9/10 | Pinned scroll, progress ring |
+| Kuro | Restaurant | 9/10 | CSS ramen bowl, pinned timeline |
+| Nexus | SaaS | 9/10 | Terminal hero, bento grid |
+| FlowBoard | SaaS | 9/10 | Inline kanban mockup |
+| Forge | DevTools | 9/10 | Terminal hero, dark-first |
+| Ember Coffee | E-commerce | 8.5/10 | Pinned timeline, warm palette |
+| Aperture | AI narrative | 8.5/10 | 7 sections, canvas particles |
+| Syncboard | SaaS | 8.5/10 | Animated cursor mockup |
+| Ceramics | E-commerce | 9/10 | Masonry gallery, lightbox |
+| Dev Portfolio | Portfolio | 9/10 | Terminal typewriter, blog routes |
 
 ---
 
@@ -106,18 +132,33 @@ You type /designer again → OFF. Agent back to normal coding.
 
 ```
 omp-designer/
-├── extension/index.ts        # omp extension (native)
-├── extensions/designer.ts    # Pi extension (compatible)
-├── skills/                   # The 5 specialists
-│   ├── designer-master.md    # The Director (8-step orchestrator)
-│   ├── taste-skill.md        # The Art Director (anti-slop + pre-flight)
-│   ├── animate.md            # The Motion Designer (easing + patterns)
-│   ├── ui-ux-pro-max.md      # The Research Library (instruction set)
-│   └── review-skill.md       # The QA Lead (post-build audit)
-└── data/ui-ux-pro-max/       # 1.7 MB design database
-    ├── design.csv            # 161 color palettes
-    ├── typography.csv        # 57 font pairings
-    └── …                     # styles, UX guidelines, per-stack configs
+├── extension/index.ts           # omp extension (autonomous workflow)
+├── extensions/designer.ts       # Pi extension (palette table)
+├── skills/                      # 9 design skills
+│   ├── designer-master.md       # 8-step autonomous workflow
+│   ├── taste-skill.md           # Anti-slop rulebook
+│   ├── product-md.md            # Brief capture
+│   ├── design-md.md             # Design system spec
+│   ├── reference-study.md       # Reference site study
+│   ├── visual-critique.md       # Screenshot evaluation
+│   ├── copywriting.md           # Human copy rules
+│   ├── scroll-choreography.md   # Narrative motion
+│   ├── animate.md               # Animation patterns
+│   ├── review-skill.md          # Post-build audit
+│   └── ui-ux-pro-max.md         # Design intelligence
+├── data/
+│   ├── ui-ux-pro-max/           # 1.7 MB design database
+│   │   ├── design.csv           # 161 color palettes
+│   │   ├── typography.csv       # 57 font pairings
+│   │   └── ...                  # styles, UX guidelines
+│   └── scroll-templates.tsx     # 5 reusable scroll patterns
+├── scripts/
+│   ├── fix-ai-slop.mjs          # Post-build em-dash fix
+│   └── analyze-layout.mjs       # Layout variety analysis
+├── test-output/                 # 13 test projects
+├── docs/problems.md             # Known issues + fixes
+├── loop.md                      # Improvement loop instructions
+└── AGENTS.md                    # AI-readable install guide
 ```
 
 ---
@@ -136,17 +177,15 @@ omp install npm:omp-designer
 # 3. Start coding
 omp
 /designer                        # DESIGNER MODE ON
-"Build me a SaaS landing page"   # AI follows the 8-step workflow
+"Build me a SaaS landing page"   # AI builds autonomously
 /designer                        # DESIGNER MODE OFF
 ```
 
-> **Best model:** MiniMax M3 (`minimax/MiniMax-M3:high`) — best design taste, follows anti-slop rules most consistently.
+> **Best model:** Kimi K2.6 (`opencode-go/kimi-k2.6:high`) — best design taste, follows anti-slop rules most consistently. MiniMax M3 is also good.
 
 ---
 
 ## MCP Servers (optional but recommended)
-
-4 external services the AI can call during the design workflow. All disabled by default, toggled ON/OFF with `/designer`.
 
 | Server | What it provides | Needs API key? |
 |--------|-----------------|----------------|
@@ -155,29 +194,22 @@ omp
 | **21st-dev-magic** | SVG logo search, component inspiration | Yes (free) |
 | **designmd** | Design system references | Yes (optional) |
 
-Setup → AGENTS.md (the AI-readable install guide in this repo).
-
 ---
 
 ## Pi compatibility
 
-The designer mode was built for omp but works on Pi too — with some differences:
-
 | Feature | omp | Pi |
 |---------|-----|-----|
-| Full 8-step workflow | ✅ | ✅ |
-| 5 design skills | ✅ | ✅ |
-| MCP servers (21st-dev, chrome-devtools, etc.) | ✅ | ✅ |
-| Plan approval (`resolve` tool) | ✅ | Chat-based fallback |
+| Full autonomous workflow | ✅ | ✅ |
+| 9 design skills | ✅ | ✅ |
+| MCP servers | ✅ | ✅ |
 | Plan files (`local://`) | ✅ | `write` fallback |
-| Subagents (`task` parallel builds) | ✅ | Sequential builds |
+| Subagents (parallel builds) | ✅ | Sequential builds |
 | `generate_image` (hero images) | ✅ | SVG logos + placeholders |
-| `web_search` (look up references) | ✅ | Uses known URLs + MCP tools |
-
-The extension detects which platform it's running on and adapts automatically.
+| `web_search` (reference study) | ✅ | Uses known URLs + MCP tools |
 
 ---
 
 ## License
 
-MIT. Bundled skills retain their respective licenses (ui-ux-pro-max: MIT, taste-skill: MIT).
+MIT. Bundled skills retain their respective licenses.
