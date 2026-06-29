@@ -94,6 +94,18 @@ Tailwind v4 generates CSS with @import after other rules.
 
 ---
 
+## LATEST CHANGES (v3.1)
+
+- [x] **Grill-Plan-Build workflow:** Agent asks 3-5 multiple-choice questions, creates plan with mood board, waits for approval, then builds
+- [x] **MCP integration during planning:** Agent discovers and uses MCPs (21st-dev, ui-layouts, chrome-devtools) during plan phase
+- [x] **Per-session designer state:** /designer only affects current session, not all sessions
+- [x] **JSX in template literal fixed:** Scroll templates caused 15 build errors, replaced with text descriptions
+- [x] **Honesty rule:** Agent cannot claim results before building them
+- [x] **Multi-page support:** Detects "various pages" and creates React Router project
+- [x] **Approval gate:** User must type "accept" before agent builds
+
+---
+
 ## Test Outputs (13 projects)
 
 | Project | Domain | Score | Key Feature |
