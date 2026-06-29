@@ -162,26 +162,38 @@ This catches em-dashes the model produces reflexively. MANDATORY.
 
 You are in DESIGNER MODE. Build the website now. Do not ask for approval.`;
 
-function readState(): { enabled: boolean; cwd?: string } {
+// Per-session state: { "cwd1": true, "cwd2": false }
+function readState(): Record<string, boolean> {
   try {
     if (existsSync(STATE_FILE)) {
-      return JSON.parse(readFileSync(STATE_FILE, "utf-8"));
+      const raw = JSON.parse(readFileSync(STATE_FILE, "utf-8"));
+      // Handle legacy format { enabled, cwd }
+      if (raw && typeof raw === "object" && "enabled" in raw) {
+        return raw.cwd ? { [raw.cwd]: raw.enabled } : {};
+      }
+      return raw;
     }
   } catch {}
-  return { enabled: false };
+  return {};
+}
+
+function writeState(state: Record<string, boolean>): void {
+  mkdirSync(join(HOME, ".omp", "agent"), { recursive: true });
+  writeFileSync(STATE_FILE, JSON.stringify(state));
 }
 
 function isOn(cwd?: string): boolean {
+  if (!cwd) return false;
   const state = readState();
-  if (!state.enabled) return false;
-  // If cwd is provided, check if it matches the stored cwd (session-scoped)
-  if (cwd && state.cwd && state.cwd !== cwd) return false;
-  return true;
+  return state[cwd] === true;
 }
 
-function setEnabled(v: boolean, cwd?: string): void {
-  mkdirSync(join(HOME, ".omp", "agent"), { recursive: true });
-  writeFileSync(STATE_FILE, JSON.stringify({ enabled: v, cwd: cwd || null }));
+function toggle(cwd: string): boolean {
+  const state = readState();
+  const newState = !state[cwd];
+  state[cwd] = newState;
+  writeState(state);
+  return newState;
 }
 
 interface CommandContext {
@@ -212,10 +224,9 @@ export default function (pi: ExtensionAPI): void {
     aliases: ["design"],
     handler: (_args: unknown, ctx: CommandContext) => {
       const cwd = process.cwd();
-      const on = isOn(cwd);
-      setEnabled(!on, cwd);
+      const nowOn = toggle(cwd);
       ctx?.ui?.notify?.(
-        !on ? "DESIGNER MODE ON" : "DESIGNER MODE OFF",
+        nowOn ? "DESIGNER MODE ON" : "DESIGNER MODE OFF",
         "info"
       );
       ctx?.editor?.setText?.("");
