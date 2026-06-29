@@ -113,67 +113,19 @@ CTA: full-width gradient, floating card, inline with content
 
 ## SCROLL TEMPLATES (use these, don't reinvent)
 
-### PinnedScroll — Content stays fixed while user scrolls through steps
-Use for: product walkthroughs, timelines, storytelling. This is the DRAMATIC SCROLL MOMENT.
-```tsx
-import { useRef } from 'react';
-import { motion, useScroll, useTransform } from 'motion/react';
+Read data/scroll-templates.tsx for complete code. Key patterns:
 
-function PinnedScroll({ steps }: { steps: { title: string; desc: string }[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] });
-  const stepIndex = useTransform(scrollYProgress, [0, 1], [0, steps.length - 1]);
-  return (
-    <section ref={ref} className="relative h-[300vh]">
-      <div className="sticky top-0 h-screen flex items-center overflow-hidden">
-        {steps.map((step, i) => (
-          <motion.div key={i} style={{ opacity: useTransform(stepIndex, [i-0.5, i, i+0.5], [0, 1, 0]) }}
-            className="absolute inset-0 flex items-center justify-center">
-            <div className="max-w-2xl text-center">
-              <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
-              <p className="text-lg text-muted-fg">{step.desc}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-```
+1. **PinnedScroll** — h-[300vh] container + sticky top-0 h-screen + useScroll + useTransform opacity per step. Steps crossfade as user scrolls. Progress dots on right side.
 
-### HorizontalScroll — Vertical scroll drives horizontal movement
-Use for: portfolios, galleries, product showcases.
-```tsx
-function HorizontalScroll({ items }: { items: { title: string; desc: string }[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] });
-  const x = useTransform(scrollYProgress, [0, 1], ['0%', '-' + (items.length - 1) * 100 + '%']);
-  return (
-    <section ref={ref} className="relative h-[300vh]">
-      <div className="sticky top-0 h-screen overflow-hidden">
-        <motion.div style={{ x }} className="flex h-full items-center gap-8 px-16">
-          {items.map((item, i) => (
-            <div key={i} className="flex-shrink-0 w-[80vw] max-w-4xl rounded-2xl border border-border bg-card p-8">
-              <h3 className="text-2xl font-bold mb-4">{item.title}</h3>
-              <p className="text-muted-fg">{item.desc}</p>
-            </div>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-```
+2. **HorizontalScroll** — h-[300vh] container + sticky + useTransform x-axis translation. Vertical scroll drives horizontal movement. Progress bar at bottom.
 
-### ScrollProgressBar — Thin bar showing scroll progress
-```tsx
-function ScrollProgressBar() {
-  const { scrollYProgress } = useScroll();
-  return <motion.div style={{ scaleX: scrollYProgress }} className="fixed top-0 left-0 right-0 h-1 bg-primary origin-left z-50" />;
-}
-```
+3. **ParallaxHero** — useScroll + useTransform for background Y offset (slower than foreground). Content fades + scales on scroll.
 
-All patterns: respect prefers-reduced-motion via useReducedMotion().
+4. **ScrollProgressBar** — fixed top-0 h-1 bg-primary + useScroll scaleX. Simplest pattern.
+
+5. **StaggeredReveal** — whileInView + viewport once + stagger delay per child. Use for grids and lists.
+
+All patterns: import from motion/react, use useRef for target, respect prefers-reduced-motion via useReducedMotion().
 
 ## DESIGN REFERENCES (offline — no web search needed)
 Study these patterns before designing. Each describes what makes it work:
