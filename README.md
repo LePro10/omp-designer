@@ -42,12 +42,38 @@ The agent takes a brief and produces **production-ready websites** without human
 
 ## How it works
 
+The agent follows a 3-phase workflow:
+
+### Phase 1: Grill Me
+Agent asks 3-5 smart multiple-choice questions:
+- Who is this for? (developers, consumers, businesses, creatives)
+- What vibe? (minimal, bold, dark, warm, premium)
+- How complex? (one-pager, landing, multi-page)
+- Any references? (Apple, Linear, Stripe, Vercel, surprise me)
+- Dark mode? (yes, no, both)
+
+### Phase 2: Plan
+Agent uses MCPs to find components, then creates:
+- Mood board (palette, fonts, reference sites)
+- Section-by-section breakdown with animations
+- Layout wireframes (ASCII art)
+- User types "accept" to approve
+
+### Phase 3: Build
+Agent implements the approved plan:
+- Writes PRODUCT.md + DESIGN.md
+- Builds all components
+- Generates images
+- Runs fix-ai-slop script
+- Screenshots and critiques
+- Ships
+
 ```
 User: "build me a landing page for my AI tool"
          │
          ▼
 ┌─────────────────────────────────────────────┐
-│  PHASE 1: UNDERSTAND                        │
+│  PHASE 1: GRILL ME                          │
 │  • Write PRODUCT.md (brief capture)         │
 │  • Study 2-3 reference sites                │
 │  • Generate 3 design directions             │
