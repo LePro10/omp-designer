@@ -1,112 +1,56 @@
 # Known Problems & TODOs
 
-## FIXED (this session)
+## LATEST CHANGES (v3.2)
 
-### P3: CSVs almost never read ✅
-**Fix:** Inlined 10 curated palette rows directly into PROMPT_INJECT.
-Agent picks from the inline table instead of needing to grep CSVs.
-
-### Fake-precision numbers ✅
-**Fix:** Rewrote taste-skill line 619: "NO invented statistics" — banned all fabricated percentages.
-Also added to PROMPT_INJECT: "No fake numbers."
-
-### Fake social proof ✅
-**Fix:** Added rule after taste-skill line 337: "NO fake social proof with real company names."
-Also added to PROMPT_INJECT: "NEVER mention real companies (Jira, Linear, Notion) ANYWHERE."
-
-### Em-dashes in copy ✅
-**Fix:** Added mandatory step 6 to PROMPT_INJECT: "Fix em-dashes — run grep to find ALL em-dashes and replace."
-Also created `scripts/fix-ai-slop.mjs` — automatic post-processing script.
-
-### Agent asks for approval instead of building ✅
-**Fix:** Updated designer-master workflow header: "READ THE ROOM. User says 'surprise me'? Skip Step 5."
-Added to PROMPT_INJECT: "NEVER ask for approval. NEVER show a plan and wait."
-
-### No DESIGN.md or PRODUCT.md ✅
-**Fix:** Created `skills/product-md.md` and `skills/design-md.md`.
-Added to PROMPT_INJECT: "Write PRODUCT.md" and "Write DESIGN.md" as explicit steps.
-
-### No reference study ✅
-**Fix:** Created `skills/reference-study.md`.
-Added offline design references to PROMPT_INJECT (Apple, Linear, Stripe, Awwwards, Vercel patterns).
-
-### No visual critique ✅
-**Fix:** Created `skills/visual-critique.md` with mobile QA checklist (8 criteria).
-
-### No copywriting rules ✅
-**Fix:** Created `skills/copywriting.md` with banned words list, copy process, style references.
-
-### No scroll choreography ✅
-**Fix:** Created `skills/scroll-choreography.md` with narrative motion patterns.
-Inlined PinnedScroll and HorizontalScroll templates in PROMPT_INJECT.
-
-### Tailwind v4 @utility nesting ✅
-**Fix:** Added Technical Notes to `skills/design-md.md` — "@utility cannot have nested media queries."
-
-### Motion vs framer-motion type confusion ✅
-**Fix:** Added motion library clarification to `skills/design-md.md` — "ease arrays must be typed as tuples."
-
-### No variant generation ✅
-**Fix:** Added to PROMPT_INJECT: "Generate 3 design directions — Conservative, Balanced, Bold. Pick the best."
-
-### No dark mode design rules ✅
-**Fix:** Added to PROMPT_INJECT: "Dark mode is a DELIBERATE design choice, not inverted colors."
-
-### No optical typography ✅
-**Fix:** Added to PROMPT_INJECT: "Display: tracking -0.02em, leading 1.1. Body: tracking 0, leading 1.6."
-
-### No component pattern library ✅
-**Fix:** Added to PROMPT_INJECT: "Heroes: split-screen, asymmetric, full-bleed, terminal, centered minimal."
-
-### Mobile QA not thorough ✅
-**Fix:** Added mobile QA checklist to `skills/visual-critique.md` — 8 criteria for 375px viewport.
-
-### Review skill missing animation + copy checks ✅
-**Fix:** Added sections 3.6 (Animation Quality) and 3.7 (Copy Audit) to `skills/review-skill.md`.
-
----
+- [x] **Grill Me enforcement:** PROMPT_INJECT now says "MANDATORY FIRST ACTION: Ask the user questions" — agent MUST ask questions before doing anything else
+- [x] **Short PROMPT_INJECT:** Reduced from 180 lines to ~70 lines. Skills contain the actual rules, PROMPT_INJECT just references them.
+- [x] **MCP toggling restored:** Extension enables/disables MCPs in mcp.json when /designer is toggled
+- [x] **Prominent MCP section:** MCP tools listed with exact tool names and example calls
+- [x] **Per-session designer state:** /designer only affects current session
+- [x] **Skill reading map:** Explicit table of WHEN to read each skill
 
 ## REMAINING
 
-### P1: Model capability
-The free model (deepseek-v4-flash-free) doesn't always follow rules for long-form content.
-**Workaround:** fix-ai-slop.mjs catches reflexive em-dashes. Rules are in PROMPT_INJECT for stronger models.
+### P1: Agent doesn't always read skills
+The agent may skip reading skills even when told to. The PROMPT_INJECT now says "READ designer-master/SKILL.md FIRST" but the agent might not comply.
+**Status:** v3.2 makes Grill Me mandatory as the FIRST action. Testing.
 
-### P2: Agent doesn't always study references
-Web search times out frequently. Agent falls back to knowledge.
-**Workaround:** Offline design references in PROMPT_INJECT (Apple, Linear, Stripe, Awwwards, Vercel).
+### P2: Em-dashes still appear
+The model produces em-dashes reflexively despite the ban.
+**Workaround:** fix-ai-slop.mjs catches them post-build.
 
-### P4: Image generation not used
+### P3: Image generation not used
 Agent defaults to Unsplash or CSS illustrations instead of generate_image.
-**Status:** Added better prompts to PROMPT_INJECT. Model preference issue.
+**Status:** Added better prompts. Model preference issue.
 
-### P5: Agent can't see screenshots
-Model limitation — agent can take screenshots but can't evaluate them visually.
-**Workaround:** Layout analysis tool (scripts/analyze-layout.mjs) + code-based critique.
+### P4: Agent can't see screenshots
+Model limitation. Agent can take screenshots but can't evaluate visually.
+**Workaround:** Layout analysis tool + code-based critique.
 
-### P6: Pinned scroll boilerplate
-Agent reinvents scroll boilerplate every time despite templates.
-**Status:** Inlined PinnedScroll and HorizontalScroll templates directly in PROMPT_INJECT.
-
-### P7: CSS @import warning
+### P5: CSS @import warning
 Tailwind v4 generates CSS with @import after other rules.
 **Status:** Warning only, doesn't break functionality.
 
 ---
 
-## LATEST CHANGES (v3.1)
+## FIXED
 
-- [x] **Grill-Plan-Build workflow:** Agent asks 3-5 multiple-choice questions, creates plan with mood board, waits for approval, then builds
-- [x] **MCP integration during planning:** Agent discovers and uses MCPs (21st-dev, ui-layouts, chrome-devtools) during plan phase
-- [x] **Per-session designer state:** /designer only affects current session, not all sessions
-- [x] **JSX in template literal fixed:** Scroll templates caused 15 build errors, replaced with text descriptions
-- [x] **Honesty rule:** Agent cannot claim results before building them
-- [x] **Multi-page support:** Detects "various pages" and creates React Router project
-- [x] **Approval gate:** User must type "accept" before agent builds
+- [x] CSVs never read → Inlined palette table in PROMPT_INJECT
+- [x] Fake numbers → Banned in taste-skill + PROMPT_INJECT
+- [x] Fake social proof → Banned in taste-skill + PROMPT_INJECT
+- [x] Em-dashes in PROMPT_INJECT → Replaced with double-dashes
+- [x] Approval conflict → Grill-Plan-Build workflow with explicit approval gate
+- [x] Multi-page support → Detects "various pages" and creates React Router
+- [x] Premature claims → HONESTY RULE added
+- [x] MCP tools not discovered → Prominent MCP section in PROMPT_INJECT
+- [x] Color palette not locked → "LOCK the palette" reinforced
+- [x] JSX in template literal → Removed, replaced with text descriptions
+- [x] Per-session state → State file stores per-cwd entries
+- [x] MCP toggling → Extension enables/disables MCPs on toggle
 
 ---
 
-## Test Outputs (13 projects)
+## Test Outputs
 
 | Project | Domain | Score | Key Feature |
 |---------|--------|-------|-------------|
@@ -124,4 +68,4 @@ Tailwind v4 generates CSS with @import after other rules.
 | test-output/ceramics-product/ | E-commerce | 9/10 | Masonry gallery |
 | test-output/dev-portfolio/ | Portfolio | 9/10 | Terminal typewriter |
 
-All 13 tests: zero AI tells (no em-dashes, no buzzwords, no fake numbers, no real company names).
+All 13 tests: zero AI tells.
