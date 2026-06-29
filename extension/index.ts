@@ -226,7 +226,39 @@ function toggle(cwd: string): boolean {
   const newState = !state[cwd];
   state[cwd] = newState;
   writeState(state);
+  setDesignerMcpEnabled(newState);
   return newState;
+}
+
+// MCP server names managed by designer mode
+const DESIGNER_MCP_NAMES = new Set([
+  "21st-dev-magic",
+  "ui-layouts",
+  "designmd",
+  "chrome-devtools",
+]);
+
+const MCP_CONFIG = join(HOME, ".omp", "agent", "mcp.json");
+
+function setDesignerMcpEnabled(enabled: boolean): void {
+  try {
+    if (!existsSync(MCP_CONFIG)) return;
+    const raw = readFileSync(MCP_CONFIG, "utf-8");
+    const config = JSON.parse(raw);
+    if (!config || typeof config !== "object" || !config.mcpServers) return;
+    let changed = false;
+    for (const [name, server] of Object.entries(config.mcpServers)) {
+      if (DESIGNER_MCP_NAMES.has(name) && server && typeof server === "object") {
+        if (server.enabled !== enabled) {
+          server.enabled = enabled;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      writeFileSync(MCP_CONFIG, JSON.stringify(config, null, 2) + String.fromCharCode(10));
+    }
+  } catch { /* mcp.json missing or corrupt — no crash */ }
 }
 
 interface CommandContext {
@@ -252,6 +284,14 @@ interface ExtensionAPI {
 }
 
 export default function (pi: ExtensionAPI): void {
+  // Sync MCP enabled state on startup
+  try {
+    const state = readState();
+    const cwd = process.cwd();
+    if (state[cwd]) {
+      setDesignerMcpEnabled(true);
+    }
+  } catch {}
   pi.registerCommand("designer", {
     description: "Toggle designer mode — autonomous UI/UX design workflow",
     aliases: ["design"],
