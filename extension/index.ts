@@ -210,18 +210,26 @@ This catches em-dashes the model produces reflexively. MANDATORY.
 
 You are in DESIGNER MODE. Build the website now. Do not ask for approval.`;
 
-function isOn(): boolean {
+function readState(): { enabled: boolean; cwd?: string } {
   try {
     if (existsSync(STATE_FILE)) {
-      return JSON.parse(readFileSync(STATE_FILE, "utf-8"))?.enabled === true;
+      return JSON.parse(readFileSync(STATE_FILE, "utf-8"));
     }
   } catch {}
-  return false;
+  return { enabled: false };
 }
 
-function setEnabled(v: boolean): void {
+function isOn(cwd?: string): boolean {
+  const state = readState();
+  if (!state.enabled) return false;
+  // If cwd is provided, check if it matches the stored cwd (session-scoped)
+  if (cwd && state.cwd && state.cwd !== cwd) return false;
+  return true;
+}
+
+function setEnabled(v: boolean, cwd?: string): void {
   mkdirSync(join(HOME, ".omp", "agent"), { recursive: true });
-  writeFileSync(STATE_FILE, JSON.stringify({ enabled: v }));
+  writeFileSync(STATE_FILE, JSON.stringify({ enabled: v, cwd: cwd || null }));
 }
 
 interface CommandContext {
@@ -242,8 +250,8 @@ interface ExtensionAPI {
     name: string,
     opts: { description: string; aliases?: string[]; handler: (args: unknown, ctx: CommandContext) => void }
   ): void;
-  on(event: "resources_discover", handler: () => ResourceDiscoverResult | undefined): void;
-  on(event: "before_agent_start", handler: (event: AgentStartEvent) => { systemPrompt: string[] } | undefined): void;
+  on(event: "resources_discover", handler: (event?: unknown, ctx?: { cwd?: string }) => ResourceDiscoverResult | undefined): void;
+  on(event: "before_agent_start", handler: (event: AgentStartEvent, ctx?: { cwd?: string }) => { systemPrompt: string[] } | undefined): void;
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -251,8 +259,9 @@ export default function (pi: ExtensionAPI): void {
     description: "Toggle designer mode — autonomous UI/UX design workflow",
     aliases: ["design"],
     handler: (_args: unknown, ctx: CommandContext) => {
-      const on = isOn();
-      setEnabled(!on);
+      const cwd = process.cwd();
+      const on = isOn(cwd);
+      setEnabled(!on, cwd);
       ctx?.ui?.notify?.(
         !on ? "DESIGNER MODE ON" : "DESIGNER MODE OFF",
         "info"
@@ -261,13 +270,13 @@ export default function (pi: ExtensionAPI): void {
     },
   });
 
-  pi.on("resources_discover", () => {
-    if (!isOn()) return;
+  pi.on("resources_discover", (_event?: unknown, ctx?: { cwd?: string }) => {
+    if (!isOn(ctx?.cwd)) return;
     return { skillPaths: SKILL_PATHS };
   });
 
-  pi.on("before_agent_start", (event: AgentStartEvent) => {
-    if (!isOn()) return;
+  pi.on("before_agent_start", (event: AgentStartEvent, ctx?: { cwd?: string }) => {
+    if (!isOn(ctx?.cwd)) return;
     const existing = event?.systemPrompt;
     const prompts = Array.isArray(existing)
       ? existing
