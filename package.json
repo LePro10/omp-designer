@@ -1,8 +1,8 @@
 {
   "name": "omp-designer",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
-  "description": "Designer Mode for Pi — toggleable UI/UX design workflow with 5 specialized skills, 161 color palettes, 57 font pairings, and 4 MCP integrations",
+  "description": "Autonomous AI design system — 9 skills, 161 palettes, 57 font pairings, zero AI tells. Takes a brief and produces production-ready websites.",
   "keywords": [
     "pi-package",
     "pi",
@@ -36,12 +36,13 @@
     ]
   },
   "files": [
+    "extension/",
     "extensions/",
     "skills/",
     "data/",
+    "scripts/",
     "docs/",
     "AGENTS.md",
-    "architecture.md",
     "package.json"
   ],
   "devDependencies": {
