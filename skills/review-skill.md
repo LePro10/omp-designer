@@ -1,6 +1,6 @@
 ---
 name: design-review
-description: "Post-implementation quality check: build, console, a11y. Functional only — does not judge visual quality. Max 3 fix cycles."
+description: "Post-implementation quality check: build, console, a11y, animations, copy. Max 3 fix cycles."
 ---
 
 # Design Review
@@ -34,9 +34,27 @@ Execute after implementation. Run these checks, fix critical issues, loop max 3x
   - `grep -rn '—' src/` → em-dashes → replace
   - `grep -rn 'gradient\|glow\|#667eea\|#764ba2\|#1a1a2e' src/` → slop
 
+## 3.6 — Animation Quality (simplified)
+Check that animations are real, not decorative:
+- ✅ Uses `motion/react` or CSS transitions with proper easing (`ease-out-quint`, `ease-in-out-cubic`)
+- ❌ `transition: all 0.3s` everywhere → use specific properties + proper easing
+- ❌ Bounce/elastic easing on everything → use `ease-out` for entrances, `ease-in` for exits
+- ❌ Infinite loops on non-marquee elements → add limit or remove
+- ⚠️ No scroll-triggered animations → report (static pages feel lifeless)
+- ✅ Respects `prefers-reduced-motion` → check for `useReducedMotion()` or CSS media query
+
+## 3.7 — Copy Audit
+Scan ALL visible text for AI tells:
+- `grep -rn '—' src/` → em-dashes → replace with `, ` or `.`
+- `grep -rn 'revolutionary\|cutting-edge\|seamless\|unlock\|empower\|leverage' src/` → filler → replace
+- Fake-precision numbers: `grep -rn '[0-9]\+%\|[0-9]\+x\|[0-9,]\+ teams' src/` → if brief didn't provide, remove
+- Real company names as social proof → replace with fictional brands or remove
+
 ## 4 — Auto-fix
-- Critical issues (build fail, console error, missing h1): fix immediately, then restart review.
-- Max 3 review cycles. After 3, report remaining issues.
+- Critical issues (build fail, console error, missing h1): fix immediately, restart review.
+- Animation: fix easing, remove infinite loops, add reduced-motion.
+- Copy: replace em-dashes, remove filler, remove invented stats.
+- Max 3 review cycles. After 3, report remaining.
 
 ## 5 — Report format
 ```
@@ -45,6 +63,8 @@ BUILD: ✅ | ❌ ...
 CONSOLE: ✅ | ⚠️ N warn | ❌ N err
 A11Y: ✅ | ⚠️ ... | ❌ ...
 COLORS: ✅ | ❌ slop hexes found
+ANIMATIONS: ✅ | ⚠️ ... | ❌ ...
+COPY: ✅ | ❌ em-dashes/filler/fake stats
 ISSUES FIXED: N
 REMAINING: N
 ```

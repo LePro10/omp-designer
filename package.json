@@ -22,12 +22,18 @@
     "url": "git+https://github.com/LePro10/omp-designer.git"
   },
   "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"],
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
     "image": "https://pi.dev/logo-auto.svg"
   },
   "omp": {
-    "extensions": ["./extension/index.ts"]
+    "extensions": [
+      "./extension/index.ts"
+    ]
   },
   "files": [
     "extensions/",
@@ -37,5 +43,9 @@
     "AGENTS.md",
     "architecture.md",
     "package.json"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
 }
