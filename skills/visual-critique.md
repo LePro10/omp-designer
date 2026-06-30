@@ -20,6 +20,17 @@ After building, take a screenshot and evaluate the design visually. This is the 
 - Tablet: 768px wide (if time permits)
 - If chrome-devtools is available, use it. Otherwise, use the browser tool.
 
+**Reveal-trigger protocol (mandatory):**
+Before taking any full-page screenshot, scroll from top to bottom and back to top once. This triggers `whileInView` / scroll-reveal sections. A full-page screenshot taken at initial page load can show blank offscreen sections because reveal animations have not entered the viewport yet.
+
+
+Also take section viewport screenshots after scrolling each major section into view. Required sections: hero, first content section, gallery/features, conversion section, footer. Full-page screenshots can miss reveal failures; section screenshots prove the content actually appears.
+
+If sections are still blank after the reveal-trigger scroll:
+- Check whether content starts at `opacity: 0` without a reachable viewport trigger.
+- Fix the animation so content is visible under reduced motion and after one scroll pass.
+- Then retake screenshots.
+
 ### 2. Evaluate — Technical criteria (desktop)
 Check these objectively:
 
@@ -33,6 +44,30 @@ Check these objectively:
 | Images load | No broken images, no 404s | All images render |
 | No overflow | No text clipped, no elements bleeding out of containers | No clipping |
 | Heading hierarchy | One h1, logical h2→h3→h4 progression | Proper nesting |
+
+
+### 2.5 Evaluate — Palette and typography audit
+
+Check built code against DESIGN.md:
+
+| Criterion | How to check | Pass |
+|---|---|---|
+| Palette fidelity | Extract hex values from `src/` and compare with DESIGN.md | No off-palette visible colors |
+| Typography source | Confirm fonts match DESIGN.md typography row | Exact heading/body fonts used |
+| Dark mode tokens | Confirm dark values are documented in DESIGN.md | No improvised per-component dark hexes |
+| Accent discipline | Count accent usage | One accent role, not many competing highlights |
+
+Any off-palette color is a fail unless it is inside an imported/generated image asset.
+
+### 2.6 Evaluate — Image source audit
+
+| Criterion | How to check | Pass |
+|---|---|---|
+| Hero visual | Inspect hero section | Real generated image, component preview, or approved placeholder |
+| Stock-photo hotlinks | Search `src/` for Unsplash, Pexels, Pixabay, random CDN photo URLs | No hits unless user provided the URL |
+| Alt text | Inspect image attributes | Meaningful alt or empty alt for decorative images |
+
+Unsplash/Pexels hotlinks are a fail. They make output feel generic and can break later.
 
 ### 3. Evaluate — Mobile QA (375px)
 These are the most common failure points on mobile:
@@ -80,6 +115,27 @@ These require judgment:
 - Read every visible string. Does it sound human?
 - Or does it sound like marketing fluff?
 - Are there em-dashes, buzzwords, fake numbers?
+
+
+### 4.5 Evaluate — Animation audit
+
+Compare animation code against DESIGN.md and animate/SKILL.md:
+
+| Criterion | How to check | Pass |
+|---|---|---|
+| Duration | Entrances 240-320ms, exits 160-220ms, hover 140-200ms | No sluggish or twitchy motion |
+| Easing | Specific easing curve, not generic `transition: all` | Motion feels intentional |
+| Properties | Transform/opacity preferred | No layout thrash |
+| Scroll reveal | `once: true` unless repeat is intentional | No noisy re-triggering |
+| Reduced motion | `useReducedMotion` or CSS media query | Big motion disables/simplifies |
+| Mobile scroll | Horizontal/pinned desktop patterns have mobile fallback | No trapped/touch-hostile scroll |
+
+### 4.6 Risk verification
+
+For every risk listed in PLAN.md:
+- Verify mitigation exists in code, or
+- Implement it before shipping, or
+- Report it as an unresolved risk.
 
 ### 5. Structure each critique point
 For every issue found:

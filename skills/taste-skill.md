@@ -317,9 +317,139 @@ Landing pages and portfolios are **visual products**. Text-only pages with fake-
 
 ---
 
-## 5-9. ANIMATION, AI TELLS, PRE-FLIGHT
+## 5. ANIMATION SKELETONS
 
-Read these sections on-demand:
-- Section 5 (animation skeletons GSAP): lines 352-470
-- Section 9 (AI Tells): lines 595-800
-- Section 14 (pre-flight): lines 910-980
+Animation is structure, not decoration. Pick one motion system per project and reuse it.
+
+### 5.A Default timing
+
+- Entrances: 240-320ms, ease-out-quint or `[0.22, 1, 0.36, 1]`.
+- Exits: 160-220ms, faster than entrances.
+- Hover: 140-200ms, transform/opacity only.
+- Stagger: 60-90ms between children, never more than 120ms.
+- Counters: 900-1200ms, ease-out, final value must be visible in screenshots.
+- Pinned scroll: one pinned story per page unless the brief explicitly asks for a narrative site.
+
+### 5.B Framer/Motion rules
+
+- Use `motion/react`, not `framer-motion`, unless the project already depends on framer-motion.
+- Animate `transform` and `opacity`. Avoid animating layout-heavy properties.
+- Scroll reveals use `viewport={{ once: true, margin: \"-80px\" }}` unless repeated reveal is the concept.
+- Use `useReducedMotion()` for large transforms, parallax, pinned scenes, and particles.
+- Do not use bounce/elastic easing for serious SaaS, finance, healthcare, or developer tools.
+
+### 5.C Scroll choreography
+
+- Every scroll effect must explain the product or story.
+- Horizontal scroll on desktop must become vertical stacked/snap content on mobile.
+- Pinned sections must have a clear beginning, progress, and end. No trapped scroll.
+- Particle fields must pause or simplify under reduced motion.
+
+### 5.D Animation anti-patterns
+
+- `transition: all 0.3s` everywhere.
+- Infinite loops on non-ambient elements.
+- Bouncy cards in enterprise/productivity interfaces.
+- Multiple competing scroll effects in one viewport.
+- Counters that screenshot mid-animation with wrong values.
+
+---
+
+## 9. AI TELLS CHECKLIST
+
+Run this before shipping. Any hit is a fix, not a note.
+
+### 9.A Copy tells
+
+- Em-dashes in prose copy.
+- Buzzwords: revolutionary, cutting-edge, seamless, empower, unlock, leverage, synergy, next-gen, game-changing, best-in-class, world-class, robust, scalable, holistic, comprehensive, innovative, transformative, elevate.
+- Patterns: \"Not just X, but Y\", \"Whether you're X or Y\", \"All-in-one\", \"Built for everyone\".
+- Fake precision: percentages, multipliers, customer counts, hospital/company/user counts, time saved, ROI, adoption, benchmark numbers not provided by the user.
+- Fake social proof: \"Trusted by\", \"Loved by\", or real company logos/names the user did not provide.
+
+### 9.B Visual tells
+
+- AI purple gradient defaults: #667eea, #764ba2, #1a1a2e, #16213e, #f0f0ff.
+- Centered hero + glowing mesh + three equal cards + generic CTA.
+- Glassmorphism everywhere.
+- Logo walls with labels under logos.
+- Div-based fake screenshots made of rectangles.
+- Every section uses the same grid/card rhythm.
+- No real visual in the hero.
+
+### 9.C Layout tells
+
+- Three equal cards repeated across multiple sections.
+- Every section centered and max-width constrained with no asymmetry.
+- Eyebrow label above every heading.
+- Zigzag image/text alternation three times in a row.
+- Pricing table copied from a generic SaaS template.
+- Footer with 40 generic links nobody asked for.
+
+### 9.D Technical tells
+
+- Hardcoded off-palette hex values.
+- Colors not present in DESIGN.md.
+- Fonts not selected from typography.csv.
+- Missing reduced-motion support.
+- Mobile horizontal overflow.
+- Build or console errors ignored.
+
+---
+
+## 14. PRE-FLIGHT CHECK
+
+Before yielding, verify this checklist in order:
+
+### 14.A Source of truth
+
+- PRODUCT.md exists and contains the actual brief facts.
+- DESIGN.md exists and contains exact palette row, exact hex values, exact font row, motion timings, spacing, and radius.
+- Every component follows DESIGN.md, not one-off values.
+
+### 14.B Data validation
+
+- Palette row came from colors.csv or the fallback table.
+- Typography row came from typography.csv.
+- All visible hex colors in `src/` are present in DESIGN.md, or are documented as generated image/SVG internals.
+- Dark mode values are documented, not improvised in components.
+
+### 14.C Copy validation
+
+- No em-dashes in visible prose.
+- No banned buzzwords.
+- No invented numbers, percentages, multipliers, counts, or named customers.
+- No fake testimonials with real company names.
+- Every claim is either user-provided or qualitative.
+
+### 14.D Motion validation
+
+- Motion uses transform/opacity where possible.
+- Durations match DESIGN.md.
+- Reduced motion is respected.
+- Counters finish before screenshots matter.
+- Mobile variants exist for pinned/horizontal scroll sections.
+
+### 14.E Visual validation
+
+- Desktop screenshot reviewed.
+- Mobile 375px screenshot reviewed.
+- No horizontal overflow.
+- Touch targets are at least 44px.
+- Hero has a real visual or a legitimate component preview.
+- Consecutive sections do not share the same layout family.
+
+### 14.F Required commands
+
+From the generated project root:
+
+```bash
+node ~/.omp/agent/extensions/designer/fix-ai-slop.mjs .
+node ~/.omp/agent/extensions/designer/analyze-layout.mjs .
+npm run build
+npx -y impeccable detect src/
+```
+
+If `impeccable` is unavailable, state that and rely on the local scripts. If any local script fails, fix and rerun.
+
+Root-scope slop scan is intentional. It must inspect PRODUCT.md and DESIGN.md too, because invented prices, lead times, shipping promises, and fake facts often get written there before they appear in components.

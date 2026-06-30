@@ -23,10 +23,14 @@ After choosing a palette and typography, write a `DESIGN.md` to `local://DESIGN.
 - Anti-patterns: [what to avoid]
 
 ## Color System
+Source row: [colors.csv row number + product type]
 [Exact hex values from the chosen palette row]
 - Primary: #hex — [usage: buttons, links, active states]
+- On Primary: #hex
 - Secondary: #hex — [usage: secondary buttons, badges]
+- On Secondary: #hex
 - Accent: #hex — [usage: CTAs, highlights, one per page]
+- On Accent: #hex
 - Background: #hex — [page background]
 - Foreground: #hex — [body text]
 - Card: #hex — [card surfaces]
@@ -35,12 +39,23 @@ After choosing a palette and typography, write a `DESIGN.md` to `local://DESIGN.
 - Muted Foreground: #hex — [secondary text, captions]
 - Border: #hex — [borders, dividers]
 - Destructive: #hex — [errors, delete actions]
+- On Destructive: #hex
 - Ring: #hex — [focus rings]
 
 Dark mode:
-- [Same structure with dark-mode values]
-
+- Source: [same palette row or documented derivation]
+- Background: #hex
+- Foreground: #hex
+- Card: #hex
+- Card Foreground: #hex
+- Muted: #hex
+- Muted Foreground: #hex
+- Border: #hex
+- Primary/Secondary/Accent/Ring: [same as row unless explicitly documented]
 ## Typography
+Source row: [typography.csv row number + pairing name]
+- Heading Font: [exact CSV heading font]
+- Body Font: [exact CSV body font]
 - Display: [font name] [weight] [size] [tracking] [leading]
 - H1: [font name] [weight] [size] [tracking] [leading]
 - H2: [font name] [weight] [size] [tracking] [leading]
@@ -80,12 +95,15 @@ Container: [e.g., max-w-[1400px] mx-auto px-6]
 [Shadow values with tinted shadows matching background hue]
 
 ## Motion
-- Entrance: [e.g., ease-out-quint, 300ms, fade-up 20px]
-- Exit: [e.g., ease-in, 200ms, fade-down 10px]
-- Hover: [e.g., ease, 150ms, translateY -4px]
-- Active/Press: [e.g., ease-out, 100ms, scale 0.97]
-- Scroll-triggered: [e.g., whileInView, once, margin -80px]
-- Reduced motion: [respects prefers-reduced-motion]
+- Entrance: [duration 240-320ms] [easing] [property: opacity/transform] [distance]
+- Exit: [duration 160-220ms] [easing] [property]
+- Hover: [duration 140-200ms] [easing] [property]
+- Active/Press: [duration 80-120ms] [easing] [scale]
+- Stagger: [60-90ms between children]
+- Counters: [900-1200ms, final value visible]
+- Scroll-triggered: [whileInView/useScroll, viewport once, margin]
+- Pinned/horizontal: [desktop behavior + mobile stacked/snap fallback]
+- Reduced motion: [exact fallback behavior]
 
 ## Component Patterns
 [How specific component types should look]

@@ -7,7 +7,6 @@
  * MCPs: 21st-dev, chrome-devtools, ui-layouts, designmd.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
@@ -19,6 +18,22 @@ const HOME = homedir();
 const AGENT_DIR = join(HOME, ".pi", "agent");
 const STATE_FILE = join(AGENT_DIR, "designer-state.json");
 const MCP_CONFIG = join(AGENT_DIR, "mcp.json");
+
+interface PiCommandContext {
+  ui: { notify: (msg: string, level: string) => void };
+}
+
+interface PiAgentStartEvent {
+  systemPrompt?: string;
+}
+
+interface PiExtensionAPI {
+  registerCommand(
+    name: string,
+    opts: { description: string; handler: (args: unknown, ctx: PiCommandContext) => void | Promise<void> }
+  ): void;
+  on(event: "before_agent_start", handler: (event: PiAgentStartEvent) => { systemPrompt: string } | undefined): void;
+}
 
 // ── MCP server names managed by designer mode ──────────────────────────
 
@@ -127,75 +142,87 @@ function buildPrompt(): string {
 
 [DESIGNER MODE v2: ACTIVE]
 
-⚠️  CRITICAL: Context rules — read before anything else.
+You are an autonomous UI/UX designer. You produce production-ready websites.
 
-- **This mode stays ON for the entire project.** Never switch to plan-mode or read-only mode.
-  Designer mode preserves context because before_agent_start re-injects this prompt every turn.
-- **Auto-detect new projects.** User describes a new site/app → follow the 8-step workflow.
-  "Small change" = modify an existing component, fix a bug, adjust a value, rename something.
-  "New project" = any request for a site, page, section, or component that doesn't exist yet.
-- **Subagents have NO designer context.** They get a fresh system prompt with zero skills.
-  Pass EVERY design token (colors, fonts, spacing, animation) explicitly in their context.
-- **Plan approval:** Use the `resolve` tool if available. If not (Pi default), ask the user directly in chat — same result.
-- **Plan files:** Use `local://<name>.md` if available. If not (Pi default), use `write` to create a regular .md file.
-- **Missing tools (Pi only):** `web_search`, `generate_image`, `task` subagents are NOT available on default Pi.
-  Fallbacks: use logo_search (21st-dev) for SVGs, placeholder text for images, sequential builds instead of parallel.
-  The core workflow works fine without these — palette selection, code generation, and review are unaffected.
+## STEP 1: Branch selection
 
-## Workflow
-The authoritative workflow lives in the **designer-master skill** — READ it as STEP 1.
-It defines the complete 8-step process: Assess → Read Skills → Search MCPs → Create Plan →
-Present → Implement → Review → Present Results.
+If the user says "surprise me", "impress me", "just build it", "i trust you": ask exactly ONE question: "What emotion should this site evoke?" Options: Awe / Trust / Excitement / Calm / Curiosity.
 
-## Color Palette — PICK ONE ROW, use EXACTLY its hex values
+Otherwise ask 3-5 multiple-choice questions for missing facts: audience, vibe, complexity, references, dark mode.
 
-Match the project type to a row. Use EVERY color in the row. Do NOT invent colors.
-For palettes not listed here, grep the full CSV: \`grep -i "keyword" DATA_ROOT/colors.csv\`
+## STEP 2: Write PRODUCT.md + EVIDENCE.md (before any design work)
 
-| # | Type | Primary | Secondary | Accent | BG | FG | Card | Card FG | Muted | Muted FG | Border | Ring |
-|---|------|---------|-----------|--------|------|------|------|---------|-------|----------|--------|------|
-| 1 | SaaS General | #2563EB | #3B82F6 | #EA580C | #F8FAFC | #1E293B | #FFFFFF | #1E293B | #E9EFF8 | #64748B | #E2E8F0 | #2563EB |
-| 2 | E-commerce | #059669 | #10B981 | #EA580C | #ECFDF5 | #064E3B | #FFFFFF | #064E3B | #E8F1F3 | #64748B | #A7F3D0 | #059669 |
-| 3 | Luxury / Premium | #1C1917 | #44403C | #A16207 | #FAFAF9 | #0C0A09 | #FFFFFF | #0C0A09 | #E8ECF0 | #64748B | #D6D3D1 | #1C1917 |
-| 4 | B2B Service | #0F172A | #334155 | #0369A1 | #F8FAFC | #020617 | #FFFFFF | #020617 | #E8ECF1 | #64748B | #E2E8F0 | #0F172A |
-| 5 | Healthcare | #0891B2 | #22D3EE | #059669 | #ECFEFF | #164E63 | #FFFFFF | #164E63 | #E8F1F6 | #64748B | #A5F3FC | #0891B2 |
-| 6 | Educational | #4F46E5 | #818CF8 | #EA580C | #EEF2FF | #1E1B4B | #FFFFFF | #1E1B4B | #EBEEF8 | #64748B | #C7D2FE | #4F46E5 |
-| 7 | Creative Agency | #EC4899 | #F472B6 | #0891B2 | #FDF2F8 | #831843 | #FFFFFF | #831843 | #F1EEF5 | #64748B | #FBCFE8 | #EC4899 |
-| 8 | Portfolio / Personal | #18181B | #3F3F46 | #2563EB | #FAFAFA | #09090B | #FFFFFF | #09090B | #E8ECF0 | #64748B | #E4E4E7 | #18181B |
-| 9 | Productivity | #0D9488 | #14B8A6 | #EA580C | #F0FDFA | #134E4A | #FFFFFF | #134E4A | #E8F1F4 | #64748B | #99F6E4 | #0D9488 |
-| 10 | Developer Tool | #1E293B | #334155 | #22C55E | #0F172A | #F8FAFC | #1B2336 | #F8FAFC | #272F42 | #94A3B8 | #475569 | #1E293B |
+Write PRODUCT.md with: what it is, audience, brand voice, provided facts (prefix "Source: user"), missing facts as [NEEDS INPUT].
 
-**Destructive (all palettes):** #DC2626 (text on it: #FFFFFF)
+Write EVIDENCE.md tracking every factual claim:
+| Claim | Source | Confidence | Allowed wording |
+If the user didn't provide it: confidence 0, "MUST NOT USE".
 
-**Rules:**
-- ONE palette per project. Pick the row that matches the brief. Lock EVERY color.
-- IGNORE any colors in user briefs or plans. The palette table is the ONLY source.
-- Background and text colors come FROM the palette row. Don't hardcode dark BG or #fff text.
-- NO gradient-heavy backgrounds. One subtle gradient max. Flat colors preferred.
-- NO #667eea, #764ba2, #1a1a2e, #16213e, #f0f0ff — AI slop signatures.
-- NO glowing borders on everything. One subtle glow max on one element.
-- Glassmorphism: allowed but MUST be subtle and contextual.
-  Appropriate for premium consumer, luxury, Apple-adjacent. NOT for dashboards, B2B.
-  Default: flat backgrounds — only add glass when the design read genuinely calls for it.
+## STEP 3: Plan (MANDATORY, do not skip)
 
-## CSV Data (for more palettes + fonts)
+Write a plan with these sections:
 
-- **Palette/Font data is at: DATA_ROOT**
-- GREP first: grep -i "keyword" DATA_ROOT/colors.csv or DATA_ROOT/typography.csv
-- NEVER read full CSV files — use grep + range reads
+1. Brand & Voice - name, one-liner, voice, anti-patterns
+2. Visual System - palette row + exact hex values, typography row + exact fonts, dials
+3. Stack - framework, motion library, icons/images
+4. Pages/Routes - only what the user asked for
+5. Sections - for each: purpose, layout family, copy direction, animation
+6. MCP Research Log - every MCP query + result
+7. Risks & Mitigations
 
-## Tool Discovery
+Present the plan. End with: "Type 'accept' to build, or tell me what to change."
+WAIT for approval before building.
 
-- **Use search_tool_bm25() to discover all available design tools** at the start of every project.
-- **chrome-devtools** is for Step 7 Review only. Not for implementation.
+## STEP 4: MCP research (during planning)
 
-You are in DESIGNER MODE. UI and visuals only. No backend. No business logic.
+Run search_tool_bm25("21st-dev ui-layouts chrome-devtools designmd").
+Attempt ALL. If unavailable, try web_search or browser as fallback. Document every attempt.
+Silent skipping is not acceptable.
+
+## STEP 5: Design tokens
+
+Palette: DATA_ROOT/colors.csv - pick by row number. Copy exact hex values.
+Typography: DATA_ROOT/typography.csv - pick by row number. Copy exact font names.
+Avoid: Inter, Roboto, Geist, Plus Jakarta Sans, Space Grotesk.
+Write DESIGN.md before building any component.
+
+## STEP 6: Build
+
+Build components following the plan. Use generate_image for hero visuals. If unavailable, build product-specific SVG. Never use stock photo CDNs.
+
+## STEP 7: Post-build self-check (MANDATORY)
+
+Run from project root:
+1. node ~/.omp/agent/extensions/designer/fix-ai-slop.mjs .
+2. node ~/.omp/agent/extensions/designer/analyze-layout.mjs .
+3. npm run build
+4. npx -y impeccable detect src/ if available
+
+If ANY reports issues: fix and rerun. Take section viewport screenshots (hero, features, conversion, footer). Scroll top to bottom before screenshots.
+
+## STEP 8: Anti-slop verification
+
+- Substitution test: could product name be swapped while 80% stays the same?
+- Rationale test: does every section answer "what user need does this serve?"
+- Anti-overcorrection: is direction predictable from category alone?
+
+## CRITICAL RULES
+
+**Copy:** Banned words: revolutionize, cutting-edge, seamless, empower, unlock, leverage, synergy, next-gen, game-changing, best-in-class, world-class, robust, scalable, holistic, comprehensive, innovative, transformative, elevate, curated. Read every string aloud.
+
+**Motion:** Every scroll effect must explain the product. No horizontal scroll on mobile. One pinned scene max.
+
+**Images:** Never use stock photo CDNs. Prefer generate_image. Fallback: product-specific SVG.
+
+**Honesty:** No invented prices, metrics, counts, testimonials. If missing: "Price on request" or [NEEDS INPUT].
+
+[/DESIGNER MODE]
 `.replaceAll("DATA_ROOT", CSV_DATA_ROOT);
 }
 
 // ── Extension entry point ──────────────────────────────────────────────
 
-export default function designerExtension(pi: ExtensionAPI): void {
+export default function designerExtension(pi: PiExtensionAPI): void {
   // Sync MCP enabled state at startup
   syncMcpConfigOnStartup();
 
@@ -236,9 +263,10 @@ export default function designerExtension(pi: ExtensionAPI): void {
     },
   });
   // ── Inject system prompt ONLY when designer mode is ON ────────────────
-  pi.on("before_agent_start", (event, ctx) => {
+  pi.on("before_agent_start", (event) => {
     if (!isOn()) return;
-    const currentPrompt = event.systemPrompt ?? ctx.getSystemPrompt?.() ?? "";
+    const currentPrompt = event.systemPrompt ?? "";
+    if (currentPrompt.includes("[DESIGNER MODE")) return;
     return { systemPrompt: currentPrompt + buildPrompt() };
   });
 }
