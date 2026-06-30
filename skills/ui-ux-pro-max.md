@@ -12,16 +12,18 @@ UI styles, UX guidelines, and chart types.
 
 ## Key Data
 
-### Colors: `src/ui-ux-pro-max/data/design.csv` (and `draft.csv`, `landing.csv`, `products.csv`)
-- 161 color palettes organized by product type
-- Each row: product category + hex values
-- Examples: "Developer Tool", "Tech Startup", "SaaS Dashboard"
-- **NOTE:** There is no `colors.csv`. The color data is spread across multiple CSVs.
-  Use `design.csv` or `draft.csv` as the primary color source.
+### Colors: `src/ui-ux-pro-max/data/colors.csv`
+- 162 product-type palette rows with explicit tokens:
+  Primary, On Primary, Secondary, On Secondary, Accent, On Accent,
+  Background, Foreground, Card, Card Foreground, Muted, Muted Foreground,
+  Border, Destructive, On Destructive, Ring.
+- This is the primary palette source for production work.
+- `design.csv`, `draft.csv`, `landing.csv`, and `products.csv` contain broader style/system references. Use them for inspiration after locking palette tokens from `colors.csv`.
 
 ### Fonts: `src/ui-ux-pro-max/data/typography.csv`
 - 57 font pairings
 - Heading + body combinations
+- Always select by row number and exact font family names.
 - Examples: Space Grotesk + DM Sans, Inter + Roboto
 
 ### UI Styles: `src/ui-ux-pro-max/data/styles.csv`

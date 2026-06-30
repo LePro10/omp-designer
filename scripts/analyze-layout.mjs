@@ -1,143 +1,297 @@
 #!/usr/bin/env node
 /**
- * analyze-layout.js — Analyze page layout structure from HTML/CSS.
- * Run: node analyze-layout.js <project-dir>
- * 
- * Reports:
- * - Section count and layout families
- * - Color usage (are all palette colors used?)
- * - Typography scale (are sizes consistent?)
- * - Spacing patterns (is 4px grid used?)
- * - Component variety (are sections different?)
+ * analyze-layout.mjs - deterministic layout/design-system audit.
+ *
+ * Usage:
+ *   node analyze-layout.mjs .
+ *
+ * Checks:
+ * - DESIGN.md exists and declares palette hex values
+ * - src/ hex colors stay within DESIGN.md
+ * - DESIGN.md motion timings stay inside default ranges
+ * - layout variety
+ * - responsive class presence
+ * - reduced-motion hints
  */
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { join, extname, basename } from "node:path";
+import { homedir } from "node:os";
 
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { join, extname } from 'path';
+const projectDir = process.argv[2] || ".";
+const SKIP_DIRS = new Set(["node_modules", "dist", ".git", ".next", "build", "coverage"]);
+const CODE_EXTENSIONS = new Set([".tsx", ".ts", ".jsx", ".js", ".css"]);
+const HEX_RE = /#[0-9a-fA-F]{6}\b/g;
 
-const projectDir = process.argv[2] || '.';
-
-// Walk directory recursively
 function walkDir(dir) {
   const files = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     const stat = statSync(full);
-    if (stat.isDirectory() && !['node_modules', 'dist', '.git'].includes(entry)) {
-      files.push(...walkDir(full));
-    } else if (['.tsx', '.ts', '.css'].includes(extname(entry))) {
+    if (stat.isDirectory()) {
+      if (!SKIP_DIRS.has(entry)) files.push(...walkDir(full));
+    } else if (CODE_EXTENSIONS.has(extname(entry)) || basename(entry) === "DESIGN.md") {
       files.push(full);
     }
   }
   return files;
 }
 
-// Extract colors from CSS/Tailwind classes
-function extractColors(content) {
+function readIfExists(path) {
+  return existsSync(path) ? readFileSync(path, "utf-8") : "";
+}
+
+function extractHexColors(content) {
   const colors = new Set();
-  // Hex colors
-  const hexMatches = content.match(/#[0-9a-fA-F]{6}/g);
-  if (hexMatches) hexMatches.forEach(c => colors.add(c.toLowerCase()));
-  // CSS variables
-  const varMatches = content.match(/var\(--color-(\w+)\)/g);
-  if (varMatches) varMatches.forEach(v => colors.add(v));
+  const matches = content.match(HEX_RE) ?? [];
+  for (const color of matches) colors.add(color.toLowerCase());
   return colors;
 }
 
-// Extract font sizes
 function extractFontSizes(content) {
   const sizes = new Set();
-  const matches = content.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/g);
-  if (matches) matches.forEach(s => sizes.add(s));
+  const matches = content.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/g) ?? [];
+  for (const size of matches) sizes.add(size);
   return sizes;
 }
 
-// Extract spacing values
 function extractSpacing(content) {
   const spacing = new Set();
-  const matches = content.match(/\b(p|m|gap|space)-(0|1|2|3|4|5|6|8|10|12|16|20|24|32|48|64|96|128)\b/g);
-  if (matches) matches.forEach(s => spacing.add(s));
+  const matches = content.match(/\b(?:p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|space-x|space-y)-(?:0|1|2|3|4|5|6|8|10|12|16|20|24|32|48|64|96|128)\b/g) ?? [];
+  for (const item of matches) spacing.add(item);
   return spacing;
 }
 
-// Analyze sections
+function detectLayout(content) {
+  if (content.includes("sticky") && /h-\[(?:200|300|400)vh\]/.test(content)) return "pinned-scroll";
+  if (content.includes("useTransform") && /x\)|translateX|overflow-x/.test(content)) return "horizontal-scroll";
+  if (content.includes("grid-cols") && content.includes("col-span")) return "bento-grid";
+  if (/grid-cols-(?:3|4|5)/.test(content)) return "multi-column-grid";
+  if (/grid-cols-2/.test(content)) return "two-column-grid";
+  if (content.includes("flex-row") && /w-(?:1\/2|3\/5|2\/5)/.test(content)) return "split";
+  if (content.includes("text-center") && /max-w-(?:2xl|3xl|4xl)/.test(content)) return "centered";
+  if (content.includes("overflow-x-auto") || content.includes("overflow-x-scroll")) return "horizontal-scroll";
+  if (content.includes("prose") || content.includes("article")) return "editorial";
+  return "unknown";
+}
+
 function analyzeSections(files) {
   const sections = [];
   for (const file of files) {
-    if (!file.endsWith('.tsx')) continue;
-    const content = readFileSync(file, 'utf-8');
-    const name = file.split('/').pop().replace('.tsx', '');
-    
-    // Detect layout type
-    let layout = 'unknown';
-    if (content.includes('sticky') && content.includes('h-[300vh]')) layout = 'pinned-scroll';
-    else if (content.includes('grid-cols') && content.includes('col-span')) layout = 'bento-grid';
-    else if (content.includes('grid-cols-3')) layout = '3-column';
-    else if (content.includes('grid-cols-2')) layout = '2-column';
-    else if (content.includes('flex-row') && content.includes('w-1/2')) layout = 'split-50/50';
-    else if (content.includes('flex-row') && content.includes('w-3/5')) layout = 'split-60/40';
-    else if (content.includes('text-center') && content.includes('max-w-3xl')) layout = 'centered';
-    else if (content.includes('overflow-x-auto') || content.includes('overflow-x-scroll')) layout = 'horizontal-scroll';
-    else if (content.includes('grid-cols-4')) layout = '4-column';
-    else if (content.includes('grid-cols-1')) layout = 'single-column';
-    
-    // Detect animations
-    const hasScrollAnimation = content.includes('whileInView') || content.includes('useScroll');
-    const hasHover = content.includes('whileHover');
-    const hasStagger = content.includes('stagger');
-    
-    sections.push({ name, layout, hasScrollAnimation, hasHover, hasStagger });
+    if (!file.endsWith(".tsx") && !file.endsWith(".jsx")) continue;
+    const content = readFileSync(file, "utf-8");
+    const name = basename(file).replace(/\.(tsx|jsx)$/, "");
+    const layout = detectLayout(content);
+    sections.push({
+      name,
+      layout,
+      hasScrollAnimation: content.includes("whileInView") || content.includes("useScroll"),
+      hasHover: content.includes("whileHover") || content.includes(":hover"),
+      hasResponsive: /\b(?:sm|md|lg|xl):/.test(content),
+      hasReducedMotion: content.includes("useReducedMotion") || content.includes("prefers-reduced-motion"),
+      riskyHorizontal: layout === "horizontal-scroll" && !/(?:md:|max-md|sm:|vertical|stack)/i.test(content),
+    });
   }
   return sections;
 }
 
-// Main
-console.log(`\n📐 Analyzing layout in ${projectDir}/\n`);
+function detectMotionTimingIssues(designContent) {
+  const issues = [];
+  const rules = [
+    { label: "Entrance", min: 240, max: 320 },
+    { label: "Exit", min: 160, max: 220 },
+    { label: "Hover", min: 140, max: 200 },
+    { label: "Active/Press", min: 80, max: 120 },
+    { label: "Stagger", min: 60, max: 90 },
+    { label: "Counters", min: 900, max: 1200 },
+  ];
 
-const files = walkDir(projectDir);
-const allColors = new Set();
-const allFontSizes = new Set();
-const allSpacing = new Set();
-
-for (const file of files) {
-  const content = readFileSync(file, 'utf-8');
-  extractColors(content).forEach(c => allColors.add(c));
-  extractFontSizes(content).forEach(s => allFontSizes.add(s));
-  extractSpacing(content).forEach(s => allSpacing.add(s));
+  const lines = designContent.split("\n");
+  for (const { label, min, max } of rules) {
+    const line = lines.find((item) => item.toLowerCase().includes(label.toLowerCase()));
+    if (!line) continue;
+    const match = line.match(/\b(\d{2,4})ms\b/i);
+    if (!match) continue;
+    const value = Number(match[1]);
+    if (value < min || value > max) {
+      issues.push(`${label} timing ${value}ms outside ${min}-${max}ms`);
+    }
+  }
+  return issues;
 }
 
-const sections = analyzeSections(files);
-
-// Report
-console.log('📊 SECTIONS:');
-const layoutCounts = {};
-for (const s of sections) {
-  layoutCounts[s.layout] = (layoutCounts[s.layout] || 0) + 1;
-  console.log(`  ${s.name}: ${s.layout} ${s.hasScrollAnimation ? '📜' : ''} ${s.hasHover ? '🖱️' : ''} ${s.hasStagger ? '⏳' : ''}`);
+function readMotionIntensity(designContent) {
+  const match = designContent.match(/MOTION_INTENSITY[:\s]*(\d)/i);
+  return match ? Number(match[1]) : 3;
 }
 
-console.log('\n🎨 LAYOUT VARIETY:');
-const uniqueLayouts = Object.keys(layoutCounts).filter(l => l !== 'unknown');
-console.log(`  Unique layouts: ${uniqueLayouts.length}`);
-for (const [layout, count] of Object.entries(layoutCounts)) {
-  console.log(`    ${layout}: ${count}`);
-}
-if (uniqueLayouts.length < 4) {
-  console.log('  ⚠️  Less than 4 unique layouts — sections may look too similar');
-}
-
-console.log('\n🔤 FONT SIZES:');
-console.log(`  Used: ${[...allFontSizes].sort().join(', ')}`);
-if (allFontSizes.size < 4) {
-  console.log('  ⚠️  Less than 4 font sizes — hierarchy may be flat');
-}
-
-console.log('\n📏 SPACING:');
-console.log(`  Used: ${[...allSpacing].sort().join(', ')}`);
-
-console.log('\n🎨 COLORS:');
-console.log(`  Count: ${allColors.size}`);
-if (allColors.size > 10) {
-  console.log('  ⚠️  More than 10 colors — may be inconsistent');
+function readCsvPaletteColors() {
+  const csvPaths = [
+    join(projectDir, "data", "ui-ux-pro-max", "colors.csv"),
+    join(projectDir, "colors.csv"),
+    join(homedir(), ".omp", "agent", "managed-skills", "ui-ux-pro-max-skill", "src", "ui-ux-pro-max", "data", "colors.csv"),
+    join(homedir(), "projects", "projects", "designer", "data", "ui-ux-pro-max", "colors.csv"),
+  ];
+  for (const csvPath of csvPaths) {
+    if (existsSync(csvPath)) {
+      const content = readFileSync(csvPath, "utf-8");
+      return extractHexColors(content);
+    }
+  }
+  return new Set();
 }
 
-console.log('\n');
+function motionCeiling(intensity) {
+  if (intensity <= 2) return 200;
+  if (intensity <= 3) return 320;
+  return 600;
+}
+
+function detectCodeMotionTimingIssues(files, motionIntensity) {
+  const ceiling = motionCeiling(motionIntensity);
+  const issues = [];
+  for (const file of files) {
+    const content = readFileSync(file, "utf-8");
+    const lines = content.split("\n");
+    lines.forEach((line, index) => {
+      const secondsMatches = line.matchAll(/duration:\s*(\d+(?:\.\d+)?)/g);
+      for (const match of secondsMatches) {
+        const seconds = Number(match[1]);
+        const ms = Math.round(seconds * 1000);
+        const isCounter = /counter|count/i.test(line);
+        if (seconds <= 10 && ms > ceiling && !isCounter) {
+          issues.push(`${basename(file)}:${index + 1} duration ${ms}ms exceeds ${ceiling}ms ceiling (MOTION_INTENSITY ${motionIntensity})`);
+        }
+      }
+
+      const classMatches = line.matchAll(/\bduration-(\d{3,4})\b/g);
+      for (const match of classMatches) {
+        const ms = Number(match[1]);
+        if (ms > ceiling) {
+          issues.push(`${basename(file)}:${index + 1} Tailwind duration-${ms} exceeds ${ceiling}ms ceiling (MOTION_INTENSITY ${motionIntensity})`);
+        }
+      }
+    });
+  }
+  return issues;
+}
+
+function printSet(label, set) {
+  const values = [...set].sort();
+  console.log(`  ${label}: ${values.length ? values.join(", ") : "none"}`);
+}
+
+console.log(`\nAnalyzing layout in ${projectDir}/\n`);
+
+let files = [];
+try {
+  files = walkDir(projectDir);
+} catch (error) {
+  console.error(`Could not analyze ${projectDir}: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+
+const srcFiles = files.filter((file) => CODE_EXTENSIONS.has(extname(file)));
+const designPath = join(projectDir, "DESIGN.md");
+const designContent = readIfExists(designPath);
+const designColors = extractHexColors(designContent);
+const usedColors = new Set();
+const fontSizes = new Set();
+const spacing = new Set();
+
+for (const file of srcFiles) {
+  const content = readFileSync(file, "utf-8");
+  for (const color of extractHexColors(content)) usedColors.add(color);
+  for (const size of extractFontSizes(content)) fontSizes.add(size);
+  for (const item of extractSpacing(content)) spacing.add(item);
+}
+
+const sections = analyzeSections(srcFiles);
+const layoutCounts = new Map();
+for (const section of sections) {
+  layoutCounts.set(section.layout, (layoutCounts.get(section.layout) ?? 0) + 1);
+}
+
+
+const blocking = [];
+const warnings = [];
+const motionIntensity = readMotionIntensity(designContent);
+const codeMotionTimingIssues = detectCodeMotionTimingIssues(srcFiles, motionIntensity);
+if (!designContent) {
+  blocking.push("DESIGN.md missing at project root");
+} else if (designColors.size === 0) {
+  blocking.push("DESIGN.md has no hex palette values");
+}
+
+const csvPaletteColors = readCsvPaletteColors();
+if (csvPaletteColors.size > 0 && designColors.size > 0) {
+  const invented = [...designColors].filter((color) => {
+    if (csvPaletteColors.has(color)) return false;
+    // Allow common dark-mode surface colors (blacks, dark grays, whites)
+    if (/^#(0[0-9a-f]{5}|1[0-9a-f]{5}|2[0-9a-f]{5}|f[0-9a-f]{5}|e[0-9a-f]{5})$/i.test(color)) return false;
+    return true;
+  });
+  if (invented.length > 0) {
+    blocking.push(`DESIGN.md colors not in CSV palette: ${invented.join(", ")} (agent invented these, not from colors.csv)`);
+  }
+}
+
+const offPalette = [...usedColors].filter((color) => designColors.size > 0 && !designColors.has(color));
+if (offPalette.length > 0) blocking.push(`Off-palette colors in src/: ${offPalette.join(", ")}`);
+
+const motionTimingIssues = detectMotionTimingIssues(designContent);
+for (const issue of motionTimingIssues) blocking.push(issue);
+
+
+const uniqueLayouts = [...layoutCounts.keys()].filter((layout) => layout !== "unknown");
+if (sections.length >= 4 && uniqueLayouts.length < 3) warnings.push("Less than 3 known layout families across 4+ sections");
+if (fontSizes.size < 4) warnings.push("Less than 4 text size classes detected; hierarchy may be flat");
+
+const nonResponsive = sections.filter((section) => !section.hasResponsive && section.layout !== "unknown");
+if (nonResponsive.length > 0) warnings.push(`Sections without responsive class hints: ${nonResponsive.map((section) => section.name).join(", ")}`);
+
+const riskyHorizontal = sections.filter((section) => section.riskyHorizontal);
+if (riskyHorizontal.length > 0) blocking.push(`Horizontal scroll without obvious mobile fallback: ${riskyHorizontal.map((section) => section.name).join(", ")}`);
+
+const animatedSections = sections.filter((section) => section.hasScrollAnimation || section.hasHover);
+const reducedMotionCoverage = sections.some((section) => section.hasReducedMotion) || srcFiles.some((file) => readFileSync(file, "utf-8").includes("prefers-reduced-motion"));
+if (animatedSections.length > 0 && !reducedMotionCoverage) warnings.push("Animations detected but no reduced-motion handling found");
+
+console.log("SECTIONS:");
+for (const section of sections) {
+  console.log(`  ${section.name}: ${section.layout} scroll=${section.hasScrollAnimation} hover=${section.hasHover} responsive=${section.hasResponsive}`);
+}
+
+console.log("\nLAYOUT VARIETY:");
+console.log(`  Unique known layouts: ${uniqueLayouts.length}`);
+for (const [layout, count] of layoutCounts.entries()) console.log(`  ${layout}: ${count}`);
+
+console.log("\nDESIGN COLORS:");
+printSet("DESIGN.md", designColors);
+printSet("src", usedColors);
+
+console.log("\nTYPOGRAPHY AND SPACING:");
+printSet("font sizes", fontSizes);
+printSet("spacing", spacing);
+
+console.log("\nMOTION TIMING:");
+const allMotionIssues = [...motionTimingIssues, ...codeMotionTimingIssues];
+if (allMotionIssues.length === 0) {
+  console.log("  DESIGN.md and component timings within default ranges or not specified");
+} else {
+  for (const issue of allMotionIssues) console.log(`  FAIL ${issue}`);
+}
+
+if (warnings.length > 0) {
+  console.log("\nWARNINGS:");
+  for (const warning of warnings) console.log(`  WARN ${warning}`);
+}
+
+if (blocking.length > 0) {
+  console.log("\nBLOCKING:");
+  for (const item of blocking) console.log(`  FAIL ${item}`);
+  console.log("");
+  process.exit(1);
+}
+
+console.log("\nLayout/design-system audit passed.\n");
+process.exit(0);

@@ -132,22 +132,19 @@ const item = {
 4. **Always respect prefers-reduced-motion**: See accessibility section in references
 5. **Use springs for interruptible animations**: Better UX when users interrupt
 
-## Examples
+## Reusable Patterns
 
-Complete working examples from the course are in the `examples/` directory:
+Use the inline patterns above as the source of truth. The installed skill includes `references/` documents, but not a guaranteed `examples/` directory. Do not stop to look for missing example files.
 
-| Example | Description | Key Techniques |
-|---------|-------------|----------------|
-| `card-hover.tsx` | Slide-up description on hover | CSS transitions, transform, opacity |
-| `toast-stacking.tsx` | Animated toast notifications | CSS custom properties, data-* triggers |
-| `text-reveal.tsx` | Staggered letter animation | @keyframes, animation-delay, calc() |
-| `shared-layout.tsx` | Element position/size morph | Framer Motion layoutId |
-| `animate-height.tsx` | Smooth height changes | useMeasure, animate height |
-| `multi-step-flow.tsx` | Directional step wizard | AnimatePresence, custom variants |
-| `feedback-popover.tsx` | Button-to-popover expansion | Nested layoutId, form states |
-| `app-store-card.tsx` | iOS-style card expansion | Multiple layoutId elements |
+Before adding animation code to a component, choose one pattern:
 
-To use an example, read it with: `Read examples/<name>.tsx`
+| Pattern | Use for | Avoid when |
+|---------|---------|------------|
+| Fade-up reveal | Section entrances | Every tiny child element |
+| Staggered list | Cards, logos, feature lists | Large paragraphs |
+| Scroll-linked transform | Storytelling, hero depth | Core text readability |
+| Shared layout | Tabs, nav indicators | Pure decoration |
+| CSS hover transition | Buttons/cards | Complex state changes |
 
 ## References
 

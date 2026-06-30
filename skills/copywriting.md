@@ -86,6 +86,19 @@ Primary CTAs should be 1-3 words:
 - Fake statistics: "47% faster", "10,000+ teams"
 - "Trusted by [real companies the user didn't mention]"
 
+
+### 8.5 Validation checkpoint
+
+After writing each section's visible copy, scan it before moving on:
+- No em-dashes in prose.
+- No banned buzzwords from the list above.
+- No invented numbers, percentages, multipliers, or customer counts.
+- No real company names in testimonials or logo walls unless the user provided them.
+- No \"Trusted by\", \"Loved by\", or \"Used by\" social proof without sourced proof.
+- Every factual claim appears in PRODUCT.md. If it does not, rewrite as qualitative.
+
+If the section fails, fix copy immediately. Do not wait for the final review.
+
 ### 9. Style references
 
 **Apple:** Reduction. One idea per sentence. Product IS the story.

@@ -35,13 +35,38 @@ Example: "This tool saves me 2 hours a week" not "AI-powered task automation."
 What should this NOT look like? What vibes are wrong?
 Example: "Not corporate, not startup-bro, not purple-gradient-AI-slop"
 
-## Content facts
-Real facts about the product — prices, names, numbers, features. The agent uses these instead of inventing.
-If the user didn't provide facts, mark sections as `[NEEDS INPUT]` — don't fabricate.
+## User-provided facts
+Only facts explicitly provided by the user. Prefix each line with `Source: user`.
+Example: `- Source: user — Price is $49/month`
+
+## Missing facts
+Facts needed for the design but not provided. Use `[NEEDS INPUT]`.
+Example: `- Price: [NEEDS INPUT]`
+
+## Working assumptions
+Soft design assumptions allowed for layout/mood only. Never put prices, metrics, customer counts, awards, testimonials, or benchmark numbers here.
+
+## EVIDENCE.md (write alongside PRODUCT.md)
+
+Track every factual claim in a separate EVIDENCE.md:
+
+```markdown
+# EVIDENCE.md
+
+| Claim | Source | Confidence | Allowed wording | Usage |
+|-------|--------|------------|-----------------|-------|
+| Price $49/month | user brief | high | exact wording only | CTA |
+| ISO 27001 | missing | 0 | MUST NOT USE | — |
+| 10,000+ users | missing | 0 | MUST NOT USE | — |
+| Free shipping | missing | 0 | MUST NOT USE | — |
+```
+
+Rules:
+- Every externally verifiable claim (price, metric, count, certification, testimonial, award) must appear here.
+- If the user didn't provide it: confidence = 0, allowed wording = "MUST NOT USE".
+- The validator scripts check src/ against this file. Claims with confidence 0 that appear in code will be flagged.
 
 ## Constraints
-Technical constraints (framework, existing codebase), brand constraints (existing logo, colors), audience constraints (accessibility requirements, regulated industry).
-```
 
 ## Rules
 
