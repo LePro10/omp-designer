@@ -1,33 +1,56 @@
 # Known Problems & TODOs
 
-## LATEST CHANGES (v3.2)
+## LATEST CHANGES (v4.0)
 
-- [x] **Grill Me enforcement:** PROMPT_INJECT now says "MANDATORY FIRST ACTION: Ask the user questions" — agent MUST ask questions before doing anything else
-- [x] **Short PROMPT_INJECT:** Reduced from 180 lines to ~70 lines. Skills contain the actual rules, PROMPT_INJECT just references them.
-- [x] **MCP toggling restored:** Extension enables/disables MCPs in mcp.json when /designer is toggled
-- [x] **Prominent MCP section:** MCP tools listed with exact tool names and example calls
-- [x] **Per-session designer state:** /designer only affects current session
-- [x] **Skill reading map:** Explicit table of WHEN to read each skill
+### AI-SLOP.md Integration
+- [x] **AI-SLOP.md as canonical reference** — 679-line anti-slop definition added as skills/ai-slop.md
+- [x] **EVIDENCE.md validator** — fix-ai-slop.mjs reads EVIDENCE.md and flags unsupported claims
+- [x] **CSV palette validation** — analyze-layout.mjs checks DESIGN.md colors against colors.csv
+- [x] **Stable/temporal rule separation** — ai-slop.md Section 18 separates permanent principles from trend-based rules
+- [x] **Dimension-based evaluation** — review-skill.md has 14 dimensions scored 0-4
+- [x] **Anti-overcorrection check** — first-order and second-order reflex detection
+- [x] **Shipping readiness vs slop risk** — separate scores, not collapsed into one number
+
+### Validator Improvements
+- [x] **Buzzword detector** — skips "what to avoid" sections in DESIGN.md
+- [x] **Font detector** — compound exceptions (Roboto Mono != Roboto)
+- [x] **Font detector** — skips avoidance context lines
+- [x] **Motion intensity dial** — analyzer respects MOTION_INTENSITY from DESIGN.md
+- [x] **EVIDENCE.md exclusion** — EVIDENCE.md and PRODUCT.md excluded from evidence/commerce claim scanning
+- [x] **Stock photo detection** — now includes picsum.photos
+
+### PROMPT_INJECT Rewrite
+- [x] **8-step explicit workflow** — Branch → PRODUCT.md → Plan → MCP → Tokens → Build → Self-check → Anti-slop
+- [x] **Plan template** — 7-section mandatory plan with MCP Research Log
+- [x] **MCP fallback** — web_search/browser if MCPs unavailable
+- [x] **Post-build self-check** — fix-ai-slop + analyze-layout + build + impeccable
+- [x] **Critical rules embedded** — copy, motion, images, honesty rules from skipped skills
+
+---
 
 ## REMAINING
 
-### P1: Agent doesn't always read skills
-The agent may skip reading skills even when told to. The PROMPT_INJECT now says "READ designer-master/SKILL.md FIRST" but the agent might not comply.
-**Status:** v3.2 makes Grill Me mandatory as the FIRST action. Testing.
+### P1: Agent still skips post-build scripts sometimes
+The PROMPT_INJECT says "MANDATORY" but the agent selectively ignores when context is long.
+**Status:** Rules are embedded in PROMPT_INJECT. Testing.
 
-### P2: Em-dashes still appear
-The model produces em-dashes reflexively despite the ban.
-**Workaround:** fix-ai-slop.mjs catches them post-build.
+### P2: MCP research still skipped when MCPs are unavailable
+Need stronger fallback behavior — agent should use web_search or browser.
+**Status:** PROMPT_INJECT says "try web_search or browser as fallback." Testing.
 
-### P3: Image generation not used
-Agent defaults to Unsplash or CSS illustrations instead of generate_image.
-**Status:** Added better prompts. Model preference issue.
+### P3: Motion timing violations
+Agent uses 500ms entrances when DESIGN.md says 240-320ms.
+**Status:** analyze-layout.mjs now catches this. Agent must fix before shipping.
 
-### P4: Agent can't see screenshots
+### P4: Plan approval gate sometimes skipped
+Agent sometimes goes straight to building.
+**Status:** PROMPT_INJECT says "WAIT for approval before building." Testing.
+
+### P5: Agent can't see screenshots
 Model limitation. Agent can take screenshots but can't evaluate visually.
-**Workaround:** Layout analysis tool + code-based critique.
+**Workaround:** Section viewport screenshots + code-based critique.
 
-### P5: CSS @import warning
+### P6: CSS @import warning
 Tailwind v4 generates CSS with @import after other rules.
 **Status:** Warning only, doesn't break functionality.
 
@@ -35,16 +58,39 @@ Tailwind v4 generates CSS with @import after other rules.
 
 ## FIXED
 
+### v4.0
+- [x] AI-SLOP.md integration as canonical reference
+- [x] EVIDENCE.md validator with confidence tracking
+- [x] CSV palette validation (DESIGN.md vs colors.csv)
+- [x] Motion intensity dial respect
+- [x] Buzzword/font false positives from avoidance context
+- [x] Stable/temporal rule separation
+- [x] Dimension-based evaluation
+- [x] Anti-overcorrection check
+- [x] MCP fallback guidance
+- [x] Post-build self-check mandatory
+- [x] Critical rules from skipped skills embedded in PROMPT_INJECT
+- [x] Stock photo detection includes picsum.photos
+- [x] EVIDENCE.md/PRODUCT.md excluded from evidence scanning
+
+### v3.2
+- [x] Grill Me enforcement (MANDATORY FIRST ACTION)
+- [x] Short PROMPT_INJECT referencing skills
+- [x] MCP toggling restored
+- [x] Prominent MCP section
+- [x] Per-session designer state
+- [x] Skill reading map
+
+### Earlier
 - [x] CSVs never read → Inlined palette table in PROMPT_INJECT
 - [x] Fake numbers → Banned in taste-skill + PROMPT_INJECT
 - [x] Fake social proof → Banned in taste-skill + PROMPT_INJECT
-- [x] Em-dashes in PROMPT_INJECT → Replaced with double-dashes
-- [x] Approval conflict → Grill-Plan-Build workflow with explicit approval gate
+- [x] Em-dashes → fix-ai-slop.mjs catches them
+- [x] Approval conflict → 8-step workflow with approval gate
 - [x] Multi-page support → Detects "various pages" and creates React Router
-- [x] Premature claims → HONESTY RULE added
-- [x] MCP tools not discovered → Prominent MCP section in PROMPT_INJECT
-- [x] Color palette not locked → "LOCK the palette" reinforced
-- [x] JSX in template literal → Removed, replaced with text descriptions
+- [x] Premature claims → HONESTY RULE + EVIDENCE.md
+- [x] MCP tools not discovered → MCP section in PROMPT_INJECT
+- [x] Color palette not locked → CSV palette validation
 - [x] Per-session state → State file stores per-cwd entries
 - [x] MCP toggling → Extension enables/disables MCPs on toggle
 
@@ -52,20 +98,12 @@ Tailwind v4 generates CSS with @import after other rules.
 
 ## Test Outputs
 
-| Project | Domain | Score | Key Feature |
-|---------|--------|-------|-------------|
-| test-output/orbitask/ | SaaS | 9.5/10 | Pinned scroll, bento grid |
-| test-output/luna/ | Portfolio | 9.5/10 | Horizontal scroll gallery |
-| test-output/flux/ | Creative Agency | 9.5/10 | Pinned horizontal scroll |
-| test-output/ironpulse/ | Fitness | 9/10 | Pinned scroll, progress ring |
-| test-output/kuro/ | Restaurant | 9/10 | CSS ramen bowl illustration |
-| test-output/nexus/ | SaaS | 9/10 | Terminal hero, DESIGN.md |
-| test-output/flowboard-landing/ | SaaS | 9/10 | Inline kanban mockup |
-| test-output/forge/ | DevTools | 9/10 | Terminal hero, dark-first |
-| test-output/ember-coffee/ | E-commerce | 8.5/10 | Pinned timeline |
-| test-output/aperture/ | AI narrative | 8.5/10 | 7 sections, canvas |
-| test-output/syncboard-landing/ | SaaS | 8.5/10 | Animated cursor mockup |
-| test-output/ceramics-product/ | E-commerce | 9/10 | Masonry gallery |
-| test-output/dev-portfolio/ | Portfolio | 9/10 | Terminal typewriter |
-
-All 13 tests: zero AI tells.
+| Project | Domain | Palette Source | Key Feature |
+|---------|--------|---------------|-------------|
+| test-output/grind/ | Coffee subscription | CSV Row 33 | EVIDENCE.md, clean slop check |
+| test-output/drift/ | Task management | CSV Row 17 (adapted) | EVIDENCE.md, calm design |
+| test-output/still/ | Meditation | CSV Row 98 | EVIDENCE.md, breathe circles |
+| test-output/pulse/ | Fitness | CSV Row 35 | EVIDENCE.md, energetic design |
+| test-output/lumen-kiln/ | Product | CSV Row 84 | SVG illustrations |
+| test-output/quiet-cup/ | Product | CSV Row 84 | No stock photos |
+| test-output/northstar-portfolio/ | Portfolio | CSV Row 8 | WebGl particle field |
