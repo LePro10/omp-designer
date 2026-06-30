@@ -8,30 +8,31 @@ You are improving the **omp-designer** package — a `/designer` extension for o
 
 ```
 omp-designer/
-├── extension/index.ts           ← omp extension (autonomous workflow + 9 skills)
-├── extensions/designer.ts       ← Pi extension (palette table)
+├── extension/index.ts           ← omp extension (8-step workflow + 12 skills)
+├── extensions/designer.ts       ← Pi extension
 ├── skills/
 │   ├── designer-master.md       ← 8-step autonomous workflow
-│   ├── taste-skill.md           ← Anti-slop rulebook (78KB)
-│   ├── product-md.md            ← Brief capture
+│   ├── ai-slop.md               ← Canonical anti-slop definition (679 lines)
+│   ├── taste-skill.md           ← Anti-slop rules, AI tells, pre-flight
+│   ├── product-md.md            ← Brief capture + EVIDENCE.md template
 │   ├── design-md.md             ← Design system spec
 │   ├── reference-study.md       ← Study real websites
 │   ├── visual-critique.md       ← Screenshot evaluation + mobile QA
 │   ├── copywriting.md           ← Human copy rules
 │   ├── scroll-choreography.md   ← Narrative motion patterns
 │   ├── animate.md               ← Animation patterns + easing
-│   ├── review-skill.md          ← Post-build audit
+│   ├── review-skill.md          ← Post-build audit + dimension evaluation
 │   └── ui-ux-pro-max.md         ← Design intelligence
 ├── data/
 │   ├── ui-ux-pro-max/           ← 1.7 MB design database (GREP, never read full)
-│   │   ├── design.csv           ← 161 color palettes
+│   │   ├── colors.csv           ← 161 color palettes (primary palette source)
 │   │   ├── typography.csv       ← 57 font pairings
 │   │   └── ...                  ← styles, UX guidelines
 │   └── scroll-templates.tsx     ← 5 reusable scroll patterns
 ├── scripts/
-│   ├── fix-ai-slop.mjs          ← Post-build em-dash fix
-│   └── analyze-layout.mjs       ← Layout variety analysis
-├── test-output/                 ← 13 test projects
+│   ├── fix-ai-slop.mjs          ← Deterministic anti-slop validator
+│   └── analyze-layout.mjs       ← Layout + palette + motion validator
+├── test-output/                 ← Test projects
 └── docs/problems.md             ← Known issues + fixes
 ```
 
