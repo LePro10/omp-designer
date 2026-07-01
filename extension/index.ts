@@ -7,7 +7,7 @@
 
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
@@ -19,6 +19,7 @@ const CSV_DATA_ROOT = join(SKILLS_ROOT, "ui-ux-pro-max-skill", "src", "ui-ux-pro
 const QUALITY_SCRIPT = join(EXTENSION_ROOT, "fix-ai-slop.mjs");
 const LAYOUT_SCRIPT = join(EXTENSION_ROOT, "analyze-layout.mjs");
 const TRACE_DIR = join(HOME, ".omp", "agent", "designer-traces");
+const PHASE_DIR = join(HOME, ".omp", "agent", "designer-phases");
 
 const DESIGNER_MARKER_PATTERN = /\[DESIGNER MODE(?: v\d+)?: ACTIVE\]/;
 const GLOBAL_STATE_KEY = "*";
@@ -42,12 +43,18 @@ const PROMPT_INJECT = `[DESIGNER MODE: ACTIVE]
 
 You are an autonomous UI/UX designer. You produce production-ready websites.
 
-## STEP 1: Branch selection
+## STEP 1: Choose interaction mode
 
-If the user says "surprise me", "impress me", "just build it", "i trust you": ask exactly ONE question: "What emotion should this site evoke?" Options: Awe / Trust / Excitement / Calm / Curiosity.
+Pick exactly one mode before acting:
 
-Otherwise ask 3-5 multiple-choice questions for missing facts: audience, vibe, complexity, references, dark mode.
+| Mode | Trigger | First action | Approval |
+| --- | --- | --- | --- |
+| Guided | user asks to be asked, says "ask what you need", or brief is ambiguous and not urgent | Ask 3-5 multiple-choice questions | Wait for "accept", "go", or "build it" after plan |
+| Adaptive | normal brief with a few missing facts | Ask only decision-critical questions; skip nice-to-have questions | Wait for "accept", "go", or "build it" after plan |
+| Autonomous | "surprise me", "impress me", "i trust you" | Ask exactly ONE emotion question: Awe / Trust / Excitement / Calm / Curiosity | After answer: present plan, then build without a second approval wait unless user requests one |
+| Batch | "do not wait", "no approval", "build it now", "just make it", "batch", or omp -p style task | Ask no questions; document assumptions in PRODUCT.md | No approval wait; build after plan |
 
+Never combine modes. Never ask questions in Batch. Never wait for "accept" in Batch.
 ## STEP 2: Write PRODUCT.md + EVIDENCE.md (before any design work)
 
 Write PRODUCT.md with: what it is, audience, brand voice, provided facts (prefix "Source: user"), missing facts as [NEEDS INPUT].
@@ -68,10 +75,11 @@ Write a plan with these sections:
 6. **MCP Research Log** - every MCP query + result (see below)
 7. **Risks & Mitigations**
 
-Present the plan. End with: "Type 'accept' to build, or tell me what to change."
-WAIT for approval before building. Do not build until the user says "accept" or "go" or "build it".
-
-Exception: if the user explicitly says "build it now" or "just make it", you may build after the plan without waiting.
+Present the plan with the selected mode at the top.
+Approval handling follows STEP 1:
+- Guided/Adaptive: end with "Type 'accept' to build, or tell me what to change." Wait before building.
+- Autonomous: after the single emotion answer, present plan and continue without a second approval wait unless the user asks for one.
+- Batch: present concise plan and continue immediately; do not block on approval.
 
 ## STEP 4: MCP research (during planning, not after)
 
@@ -130,7 +138,7 @@ Apply these tests to the final output:
 ## CRITICAL RULES (these apply even if you skip the skills)
 
 **Copy:**
-Banned words: revolutionize, cutting-edge, seamless, empower, unlock, leverage, synergy, next-gen, game-changing, best-in-class, world-class, robust, scalable, holistic, comprehensive, innovative, transformative, elevate, curated.
+Banned words: revolutionize, cutting-edge, seamless, empower, unlock, leverage, synergy, next-gen, game-changing, best-in-class, world-class, robust, scalable, holistic, comprehensive, innovative, transformative, elevate, curated, effortless, frictionless, pioneering, groundbreaking, next-level, future-proof, bulletproof, blazing-fast, lightning-fast, world-leading, industry-leading, turnkey, battle-tested, mission-critical, enterprise-grade, supercharge.
 Banned patterns: "Not just X, but Y", "Whether you're X or Y", "All-in-one", "Built for everyone".
 Read every visible string aloud. If it sounds like marketing email, rewrite. Short sentences. Active voice.
 
@@ -293,6 +301,95 @@ function writeTrace(cwd: string | undefined, event: string, details: Record<stri
   } catch { /* tracing must never break the agent loop */ }
 }
 
+type DesignerPhase = "idle" | "planning" | "building" | "reviewing" | "validated";
+
+interface PhaseState {
+  phase: DesignerPhase;
+  updatedAt: string;
+  filesWritten: string[];
+  validatorsRun: string[];
+}
+
+function phasePathForCwd(cwd?: string): string {
+  const activeCwd = cwd ?? process.cwd();
+  const basename = activeCwd.split("/").filter(Boolean).pop() ?? "root";
+  return join(PHASE_DIR, `${basename}-${shortHash(activeCwd)}.json`);
+}
+
+function readPhase(cwd?: string): PhaseState {
+  try {
+    const path = phasePathForCwd(cwd);
+    if (existsSync(path)) {
+      const raw = JSON.parse(readFileSync(path, "utf-8")) as unknown;
+      if (raw && typeof raw === "object") {
+        const r = raw as Record<string, unknown>;
+        if (typeof r.phase === "string") {
+          return {
+            phase: r.phase as DesignerPhase,
+            updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : "",
+            filesWritten: Array.isArray(r.filesWritten) ? r.filesWritten as string[] : [],
+            validatorsRun: Array.isArray(r.validatorsRun) ? r.validatorsRun as string[] : [],
+          };
+        }
+      }
+    }
+  } catch {}
+  return { phase: "idle", updatedAt: "", filesWritten: [], validatorsRun: [] };
+}
+
+function writePhase(cwd: string | undefined, update: Partial<PhaseState>): void {
+  try {
+    const current = readPhase(cwd);
+    const next: PhaseState = {
+      phase: update.phase ?? current.phase,
+      updatedAt: new Date().toISOString(),
+      filesWritten: update.filesWritten ?? current.filesWritten,
+      validatorsRun: update.validatorsRun ?? current.validatorsRun,
+    };
+    mkdirSync(PHASE_DIR, { recursive: true });
+    writeFileSync(phasePathForCwd(cwd), JSON.stringify(next));
+  } catch { /* phase tracking must never break the agent loop */ }
+}
+
+function resetPhase(cwd: string | undefined): void {
+  try {
+    const path = phasePathForCwd(cwd);
+    if (existsSync(path)) rmSync(path);
+  } catch {}
+}
+
+/** Infer phase transition from a tool call event. Returns update or null. */
+function inferPhaseTransition(details: Record<string, unknown>, current: PhaseState): Partial<PhaseState> | null {
+  const tool = typeof details.tool === "string" ? details.tool : "";
+  const relPath = typeof details.relativePath === "string" ? details.relativePath : "";
+  const kind = typeof details.commandKind === "string" ? details.commandKind : "";
+
+  // Validator run → reviewing
+  if (kind === "fix-ai-slop" || kind === "analyze-layout" || kind === "impeccable-detect") {
+    const validators = [...new Set([...current.validatorsRun, kind])];
+    const allRun = validators.includes("fix-ai-slop") && validators.includes("analyze-layout");
+    return { phase: allRun ? "validated" : "reviewing", validatorsRun: validators };
+  }
+
+  // Writing to src/ → building
+  if ((tool === "write" || tool === "edit") && relPath.startsWith("src/")) {
+    if (current.phase === "idle" || current.phase === "planning") {
+      return { phase: "building", filesWritten: [...new Set([...current.filesWritten, relPath])] };
+    }
+    return { filesWritten: [...new Set([...current.filesWritten, relPath])] };
+  }
+
+  // Writing DESIGN.md or PRODUCT.md → planning
+  if ((tool === "write" || tool === "edit") && (relPath === "DESIGN.md" || relPath === "PRODUCT.md" || relPath === "EVIDENCE.md")) {
+    if (current.phase === "idle") {
+      return { phase: "planning", filesWritten: [...new Set([...current.filesWritten, relPath])] };
+    }
+    return { filesWritten: [...new Set([...current.filesWritten, relPath])] };
+  }
+
+  return null;
+}
+
 function summarizeToolEvent(event: unknown, cwd?: string): Record<string, unknown> {
   const record = asRecord(event);
   const input = asRecord(record.input);
@@ -350,11 +447,15 @@ function mcpStatus(): string {
 function buildDoctorReport(cwd: string): string {
   const skillsFound = SKILL_PATHS.filter((path) => existsSync(path)).length;
   const tracePath = tracePathForCwd(cwd);
+  const phase = readPhase(cwd);
   const lines = [
     "Designer doctor",
     "",
     `Source/package version: ${packageVersion(cwd)}`,
     `Designer mode for cwd: ${isOn(cwd) ? "enabled" : "disabled"}`,
+    `Current phase: ${phase.phase} (updated: ${phase.updatedAt || "never"})`,
+    `Files written this session: ${phase.filesWritten.length}`,
+    `Validators run: ${phase.validatorsRun.length > 0 ? phase.validatorsRun.join(", ") : "none"}`,
     `Installed extension hash: ${fileHash(join(EXTENSION_ROOT, "index.ts"))}`,
     `Installed fix-ai-slop: ${existsSync(QUALITY_SCRIPT) ? "present" : "missing"} (${fileHash(QUALITY_SCRIPT)})`,
     `Installed analyze-layout: ${existsSync(LAYOUT_SCRIPT) ? "present" : "missing"} (${fileHash(LAYOUT_SCRIPT)})`,
@@ -486,6 +587,7 @@ export default function (pi: ExtensionAPI): void {
   });
 
   pi.on("agent_start", (_event?: unknown, ctx?: { cwd?: string }) => {
+    if (isOn(ctx?.cwd)) writePhase(ctx?.cwd, { phase: "idle", filesWritten: [], validatorsRun: [] });
     writeTrace(ctx?.cwd, "agent_start");
   });
 
@@ -494,7 +596,13 @@ export default function (pi: ExtensionAPI): void {
   });
 
   pi.on("tool_call", (event?: unknown, ctx?: { cwd?: string }) => {
-    writeTrace(ctx?.cwd, "tool_call", summarizeToolEvent(event, ctx?.cwd));
+    const details = summarizeToolEvent(event, ctx?.cwd);
+    writeTrace(ctx?.cwd, "tool_call", details);
+    if (isOn(ctx?.cwd)) {
+      const current = readPhase(ctx?.cwd);
+      const transition = inferPhaseTransition(details, current);
+      if (transition) writePhase(ctx?.cwd, transition);
+    }
   });
 
   pi.on("tool_result", (event?: unknown, ctx?: { cwd?: string }) => {
@@ -504,18 +612,28 @@ export default function (pi: ExtensionAPI): void {
   pi.on("session_stop", (_event?: unknown, ctx?: { cwd?: string }) => {
     if (!isOn(ctx?.cwd)) return;
     const cwd = ctx?.cwd ?? process.cwd();
-    writeTrace(cwd, "auto_validation_started");
+    const phase = readPhase(cwd);
+    writeTrace(cwd, "auto_validation_started", { phase: phase.phase, filesWritten: phase.filesWritten.length, validatorsRun: phase.validatorsRun });
     const validation = runSessionStopValidation(cwd);
     if (validation.ok) {
-      writeTrace(cwd, "auto_validation_passed", validation.skipped ? { skipped: validation.skipped } : {});
+      writePhase(cwd, { phase: "validated" });
+      writeTrace(cwd, "auto_validation_passed", { phase: "validated", ...(validation.skipped ? { skipped: validation.skipped } : {}) });
       return;
     }
 
-    writeTrace(cwd, "auto_validation_failed");
+    const phaseNote = phase.phase === "idle"
+      ? "No DESIGN.md, PRODUCT.md, or src/ files were detected — validation may be running on a non-designer project."
+ : phase.phase === "building"
+      ? "Validation ran while still in building phase — validators may not have been run by the agent."
+      : "";
+
+    writeTrace(cwd, "auto_validation_failed", { phase: phase.phase });
     return {
       continue: true,
       additionalContext: [
         "[DESIGNER AUTO-VALIDATION FAILED]",
+        `Phase: ${phase.phase}`,
+        phaseNote,
         "Before answering the user, fix these blocking issues and rerun validation from the project root.",
         "",
         validation.output,
@@ -524,7 +642,7 @@ export default function (pi: ExtensionAPI): void {
         `node ${QUALITY_SCRIPT} --check .`,
         `node ${LAYOUT_SCRIPT} .`,
         "[/DESIGNER AUTO-VALIDATION FAILED]",
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
     };
   });
 }

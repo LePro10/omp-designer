@@ -17,9 +17,9 @@ User: "build me a website about AI"
          │
          ▼
 ┌─────────────────────────────────────────────┐
-│  STEP 1: BRANCH SELECTION                    │
-│  "surprise me" → ask 1 emotion question      │
-│  Otherwise → ask 3-5 multiple-choice          │
+│  STEP 1: INTERACTION MODE                    │
+│  Guided / Adaptive / Autonomous / Batch      │
+│  Batch never waits; Autonomous asks 1 emotion│
 └─────────────────┬───────────────────────────┘
                   ▼
 ┌─────────────────────────────────────────────┐
@@ -30,7 +30,7 @@ User: "build me a website about AI"
 ┌─────────────────────────────────────────────┐
 │  STEP 3: PLAN (MANDATORY)                    │
 │  7-section plan with MCP research log        │
-│  User types "accept" to approve              │
+│  Approval behavior follows selected mode     │
 └─────────────────┬───────────────────────────┘
                   ▼
 ┌─────────────────────────────────────────────┐
@@ -41,7 +41,7 @@ User: "build me a website about AI"
                   ▼
 ┌─────────────────────────────────────────────┐
 │  STEP 5: DESIGN TOKENS                       │
-│  Palette from colors.csv (by row number)     │
+│  CSV palette default; user brand wins        │
 │  Typography from typography.csv              │
 │  DESIGN.md written before any component      │
 └─────────────────┬───────────────────────────┘
@@ -66,6 +66,15 @@ User: "build me a website about AI"
 │  Shipping readiness vs slop risk             │
 └─────────────────────────────────────────────┘
 ```
+
+### Interaction modes
+
+| Mode | Trigger | Questions | Approval |
+|------|---------|-----------|----------|
+| Guided | User asks to be asked or wants a guided process | 3-5 multiple-choice | Wait after plan |
+| Adaptive | Normal brief with a few missing facts | Only decision-critical | Wait after plan |
+| Autonomous | "surprise me", "impress me", "i trust you" | One emotion question | Continue after plan unless user asks for approval |
+| Batch | `omp -p`, "do not wait", "build it now", "no approval" | None; document assumptions | No wait |
 
 ---
 
@@ -117,12 +126,14 @@ User: "build me a website about AI"
 ### Observability
 - **Run trace** — when designer mode is enabled, the omp extension writes JSONL events to `~/.omp/agent/designer-traces/<cwd-hash>.jsonl`.
 - **Traced events** — prompt injection, skill discovery, agent start/end, tool calls/results, automatic validation start/pass/fail, validator/build command kinds.
-- **Doctor command** — `/designer-doctor` writes source/install/skill/MCP/trace health into the editor.
+- **Phase tracking** — the extension tracks workflow phase (`idle → planning → building → reviewing → validated`) based on tool call patterns. Phase is stored in `~/.omp/agent/designer-phases/<cwd-hash>.json` and reported by `/designer-doctor`. Session-stop validation failures include the current phase.
+- **Doctor command** — `/designer-doctor` writes source/install/skill/MCP/trace/phase health into the editor.
 
 ### Regression suite
 - **Golden corpus** — `eval/prompts.jsonl` contains 20 fixed prompts across landing pages, e-commerce, redesign/edit, dashboards, forms, content, checkout, multi-page, mobile, reduced motion, and adversarial asks.
 - **Eval harness** — `node scripts/eval-suite.mjs validate` checks corpus coverage; `commands` prints reproducible `omp -p` runs; `score <output-root>` runs deterministic validators over generated outputs.
 - **Trace audit** — `node scripts/audit-trace.mjs <trace.jsonl> --strict` verifies prompt injection, skill discovery, automatic validation, explicit validator calls, and build calls.
+- **30 regression tests** — `npm run test:validators` (11), `npm run test:layout` (5), `npm run test:trace` (3), `npm run test:prompt` (8), `npm run test:eval` (corpus).
 
 ---
 

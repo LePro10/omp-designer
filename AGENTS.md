@@ -225,7 +225,7 @@ omp-designer/
 **Designer mode ON but still getting AI-slop?**
 - Check the model: small/fast models ignore design rules. Switch to MiniMax M3 or Claude Opus.
 - Check that skills are loaded: run `/reload` and look for skill names in startup output
-- Verify the system prompt injection is working — look for "[DESIGNER MODE v2: ACTIVE]" in context
+- Verify the system prompt injection is working — look for "[DESIGNER MODE: ACTIVE]" in context
 
 **Missing tools on Pi (resolve, local://, generate_image)?**
 - `resolve`: agent will fall back to asking the user via chat. Slower but works.

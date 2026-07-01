@@ -1,43 +1,25 @@
 # Known Problems & TODOs
 
-## LATEST CHANGES (v4.0)
+## LATEST CHANGES (v4.0 — Iteration 9)
 
-### AI-SLOP.md Integration
-- [x] **AI-SLOP.md as canonical reference** — 679-line anti-slop definition added as skills/ai-slop.md
-- [x] **EVIDENCE.md validator** — fix-ai-slop.mjs reads EVIDENCE.md and flags unsupported claims
-- [x] **CSV palette validation** — analyze-layout.mjs checks DESIGN.md colors against colors.csv
-- [x] **Stable/temporal rule separation** — ai-slop.md Section 18 separates permanent principles from trend-based rules
-- [x] **Dimension-based evaluation** — review-skill.md has 14 dimensions scored 0-4
-- [x] **Anti-overcorrection check** — first-order and second-order reflex detection
-- [x] **Shipping readiness vs slop risk** — separate scores, not collapsed into one number
+### Validator Hardening (adversarial testing)
+- [x] **TypeScript `returns` FP fix** — `detectCommerceClaims` now skips lines with code markers (`function`, `const`, `export`, `=>`, etc.)
+- [x] **Unicode multiplication sign** — multiplier regex catches `×` (U+00D7) in addition to `x`
+- [x] **En-dash detection** — `detectEmDashes` and `fixEmDashes` now catch `–` (U+2013) alongside `—` (U+2014)
+- [x] **Buzzword list expanded** — added 23 synonyms models use to bypass the list: effortless, frictionless, pioneering, groundbreaking, next-level, future-proof, bulletproof, blazing-fast, lightning-fast, world-leading, industry-leading, turnkey, battle-tested, mission-critical, enterprise-grade, supercharge, etc.
+- [x] **Adversarial false-negative tests** — 5 new tests catch gaps the validator missed
+- [x] **Total validator tests: 11** (was 7)
 
-### Validator Improvements
-- [x] **Buzzword detector** — skips "what to avoid" sections in DESIGN.md
-- [x] **Font detector** — compound exceptions (Roboto Mono != Roboto)
-- [x] **Font detector** — skips avoidance context lines
-- [x] **Motion intensity dial** — analyzer respects MOTION_INTENSITY from DESIGN.md
-- [x] **EVIDENCE.md exclusion** — EVIDENCE.md and PRODUCT.md excluded from evidence/commerce claim scanning
-- [x] **Stock photo detection** — now includes picsum.photos
+### Mechanical Phase Tracking
+- [x] **Phase state file** — `~/.omp/agent/designer-phases/<cwd-hash>.json` tracks `idle → planning → building → reviewing → validated`
+- [x] **Tool-call-driven transitions** — writing DESIGN.md/PRODUCT.md → planning; writing src/* → building; running validators → reviewing/validated
+- [x] **Phase-aware session_stop** — validation failures now report the current phase and whether validators were run by the agent
+- [x] **Phase reset on agent_start** — fresh sessions start at `idle`
+- [x] **Doctor shows phase** — `/designer-doctor` reports current phase, files written, validators run
 
-### PROMPT_INJECT Rewrite
-- [x] **8-step explicit workflow** — Branch → PRODUCT.md → Plan → MCP → Tokens → Build → Self-check → Anti-slop
-- [x] **Plan template** — 7-section mandatory plan with MCP Research Log
-- [x] **MCP fallback** — web_search/browser if MCPs unavailable
-- [x] **Post-build self-check** — fix-ai-slop + analyze-layout + build + impeccable
-- [x] **Critical rules embedded** — copy, motion, images, honesty rules from skipped skills
-
-### Mechanical Reliability
-- [x] **fix-ai-slop split** — default `--check` is read-only; `--fix` is explicit
-- [x] **Validator regression tests** — known false positives and one evasion case are now covered
-- [x] **Release gate** — `check-release.mjs` validates version/docs and scans for likely secrets
-- [x] **Run trace** — omp extension writes JSONL telemetry for prompt injection, skill discovery, agent/tool lifecycle
-- [x] **Doctor command** — `/designer-doctor` reports source/install/skill/MCP/trace health
-- [x] **Session-stop validation gate** — omp automatically runs `fix-ai-slop --check` and `analyze-layout` before final responses for generated projects
-- [x] **Golden prompt corpus** — `eval/prompts.jsonl` covers 20 fixed prompts including redesign, dashboard, form, checkout, multi-page, mobile, reduced-motion, and adversarial cases
-- [x] **Eval harness** — `eval-suite.mjs` validates corpus coverage, prints reproducible `omp -p` commands, and scores generated outputs with validators
-- [x] **Trace audit** — `audit-trace.mjs` verifies JSONL traces for prompt injection, skill discovery, auto-validation, validator calls, and build calls
-- [x] **Brand color override** — `analyze-layout.mjs` treats CSV as default, but allows Source:user brand colors and documented derivations
-- [x] **Tablet breakpoint coverage** — complex layouts now require explicit 1024px/lg breakpoint handling in `analyze-layout.mjs`
+### Docs Sync
+- [x] **AGENTS.md accuracy** — verified 12 skills, correct structure, fixed marker reference in troubleshooting
+- [x] **Release gate passes** — `check:release` validates version/docs consistency + secret scan
 
 ---
 
@@ -45,7 +27,7 @@
 
 ### P1: Agent still skips manual post-build scripts sometimes
 The PROMPT_INJECT says "MANDATORY" but the agent selectively ignores when context is long.
-**Status:** Structurally mitigated in omp: `session_stop` now runs the two deterministic validators automatically. Build/browser checks still depend on agent/tool execution.
+**Status:** Structurally mitigated in omp: `session_stop` now runs the two deterministic validators automatically. Phase tracking (`idle → planning → building → reviewing → validated`) provides mechanical evidence of whether the agent ran validators. Build/browser checks still depend on agent/tool execution.
 
 ### P2: MCP research still skipped when MCPs are unavailable
 Need stronger fallback behavior — agent should use web_search or browser.
@@ -57,7 +39,7 @@ Agent uses 500ms entrances when DESIGN.md says 240-320ms.
 
 ### P4: Plan approval gate sometimes skipped
 Agent sometimes goes straight to building.
-**Status:** PROMPT_INJECT says "WAIT for approval before building." Testing.
+**Status:** 4 explicit interaction modes (Guided/Adaptive/Autonomous/Batch) replace conflicting rules. Phase tracking detects when agent writes src/ files without DESIGN.md (skipped planning).
 
 ### P5: Agent can't see screenshots
 Model limitation. Agent can take screenshots but can't evaluate visually.
@@ -70,6 +52,10 @@ Tailwind v4 generates CSS with @import after other rules.
 ### P7: Full corpus is not yet routinely run after every change
 The corpus and scoring harness exist, but generated outputs still require a model run.
 **Status:** `npm run test:eval` validates coverage deterministically; next step is a model-backed runner/CI job.
+
+### P8: npm publish blocked
+npm token was exposed in chat history. Token should be revoked.
+**Status:** `npm whoami` returns E401. Source version 4.0.0, npm registry 3.0.0.
 
 ---
 

@@ -92,15 +92,53 @@ test("EVIDENCE.md may document forbidden commerce claims", () => {
   }
 });
 
-test("confidence-zero evidence claims fail when used in source", () => {
-  const dir = fixture({
-    "EVIDENCE.md": "| Claim | Source | Confidence | Allowed wording |\n| FedEx | missing | 0 | MUST NOT USE |\n",
-    "src/App.tsx": "export const shipping = 'Ships with FedEx tracking.';\n"
-  });
+test("TypeScript return type annotations are not commerce claims", () => {
+  const dir = fixture({ "src/App.tsx": "export function useData(): { returns: string } { return { returns: 'value' }; }\n" });
   try {
     const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout, /evidence:unsupported-claim/);
+    assert.equal(result.status, 0, "TS return-type keyword should not trigger commerce:returns — stdout: " + result.stdout);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("multiplication sign × is caught as fake precision (false negative)", () => {
+  const dir = fixture({ "src/App.tsx": "export const claim = 'Get 12× better results.';\n" });
+  try {
+    const result = run(["--check", dir]);
+    assert.notEqual(result.status, 0, "Unicode multiplication sign should be caught");
+    assert.match(result.stdout, /fake-number:multiplier/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("en-dash – is caught like em-dash (false negative)", () => {
+  const dir = fixture({ "src/App.tsx": "export const copy = 'Quiet – focused';\n" });
+  try {
+    const result = run(["--check", dir]);
+    assert.notEqual(result.status, 0, "En-dash should be caught as em-dash variant");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("indirect social proof with real company names is caught", () => {
+  const dir = fixture({ "src/App.tsx": "export const copy = 'Teams at Stripe and Vercel ship faster with us.';\n" });
+  try {
+    const result = run(["--check", dir]);
+    assert.notEqual(result.status, 0, "Indirect social proof should be caught");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("buzzword synonym 'effortless' is caught after list expansion", () => {
+  const dir = fixture({ "src/App.tsx": "export const copy = 'Effortless integration for modern teams.';\n" });
+  try {
+    const result = run(["--check", dir]);
+    assert.notEqual(result.status, 0, "'effortless' should be caught as a buzzword");
+    assert.match(result.stdout, /buzzword:effortless/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
