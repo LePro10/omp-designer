@@ -113,13 +113,18 @@ User: "build me a website about AI"
 - **Shipping readiness** — pass/fail on blocking defects
 - **Slop risk** — weighted score from 0-100
 
+### Observability
+- **Run trace** — when designer mode is enabled, the omp extension writes JSONL events to `~/.omp/agent/designer-traces/<cwd-hash>.jsonl`.
+- **Traced events** — prompt injection, skill discovery, agent start/end, tool calls/results, validator/build command kinds.
+- **Doctor command** — `/designer-doctor` writes source/install/skill/MCP/trace health into the editor.
+
 ---
 
 ## Files
 
 ```
 omp-designer/
-├── extension/index.ts           # omp extension (PROMPT_INJECT + MCP toggling)
+├── extension/index.ts           # omp extension (PROMPT_INJECT, MCP toggling, trace, doctor)
 ├── extensions/designer.ts       # Pi extension
 ├── skills/                      # 12 design skills
 │   ├── ai-slop.md               # Canonical anti-slop reference (NEW)
@@ -154,6 +159,7 @@ omp-designer/
 omp install npm:omp-designer
 omp
 /designer                        # DESIGNER MODE ON
+/designer-doctor                 # Optional: verify install, skills, MCPs, trace path
 "Build me a SaaS landing page"   # Agent asks questions first
 # Answer the questions
 # Agent shows plan with MCP research log

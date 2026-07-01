@@ -156,6 +156,7 @@ After setup, ask the user to:
 2. Type `/designer` → should see "DESIGNER MODE ON"
 3. Type `/designer` again → should see "DESIGNER MODE OFF"
 4. Type `/reload` (Pi) or restart (omp) to activate MCP servers
+5. Optional: type `/designer-doctor` → should show source/install/skill/MCP/trace health
 
 ## What NOT to do
 
@@ -172,7 +173,7 @@ After setup, ask the user to:
 ```
 omp-designer/
 ├── extensions/designer.ts    # Pi extension (pi.dev API)
-├── extension/index.ts        # omp extension (oh-my-pi API)
+├── extension/index.ts        # omp extension (prompt, MCP toggling, trace, doctor)
 ├── skills/                   # 12 auto-discovered design skills
 │   ├── ai-slop.md            # Canonical anti-slop reference
 │   ├── designer-master.md    # 8-step orchestration workflow
@@ -205,6 +206,10 @@ omp-designer/
 - Run `/reload` (Pi) or restart omp
 - Check that `npx` is available: `which npx`
 - Check API keys in mcp.json are correct
+
+**Source or installed copy may be stale?**
+- Run `/designer-doctor`
+- Check installed extension hash, script presence, managed skill count, MCP status, and trace path
 
 **Chrome errors in log?**
 - Add `--chrome-arg=--disable-logging --chrome-arg=--log-level=3` to chrome-devtools args

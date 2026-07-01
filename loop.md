@@ -37,7 +37,7 @@ omp-designer/
 └── docs/problems.md             ← Known issues + fixes
 ```
 
-The installed copy lives at `~/.omp/agent/managed-skills/` (skills get copied there on `omp install`).
+The installed copy lives at `~/.omp/agent/managed-skills/` (skills get copied there on `omp install`). Use `/designer-doctor` to check installed extension/script/skill/MCP state. Designer run traces are JSONL files under `~/.omp/agent/designer-traces/`.
 
 ## What you're doing
 
