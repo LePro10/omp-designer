@@ -47,6 +47,26 @@ function extractHexColors(content) {
   return colors;
 }
 
+function extractHexColorsFromMatchingLines(content, linePattern) {
+  const colors = new Set();
+  const lines = content.split("\n");
+  for (const line of lines) {
+    if (!linePattern.test(line)) continue;
+    for (const color of extractHexColors(line)) colors.add(color);
+  }
+  return colors;
+}
+
+function readAllowedNonCsvColors(projectDir, designContent) {
+  const allowed = new Set();
+  const productContent = readIfExists(join(projectDir, "PRODUCT.md"));
+  const productColors = extractHexColorsFromMatchingLines(productContent, /source:\s*user|brand\s+colou?rs?|provided\s+colou?rs?/i);
+  const documentedDesignColors = extractHexColorsFromMatchingLines(designContent, /source:\s*user|user-provided|provided\s+brand|brand\s+colou?r|derived\s+from|derivation/i);
+  for (const color of productColors) allowed.add(color);
+  for (const color of documentedDesignColors) allowed.add(color);
+  return allowed;
+}
+
 function extractFontSizes(content) {
   const sizes = new Set();
   const matches = content.match(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/g) ?? [];
@@ -210,8 +230,6 @@ const layoutCounts = new Map();
 for (const section of sections) {
   layoutCounts.set(section.layout, (layoutCounts.get(section.layout) ?? 0) + 1);
 }
-
-
 const blocking = [];
 const warnings = [];
 const motionIntensity = readMotionIntensity(designContent);
@@ -223,15 +241,17 @@ if (!designContent) {
 }
 
 const csvPaletteColors = readCsvPaletteColors();
+const allowedNonCsvColors = readAllowedNonCsvColors(projectDir, designContent);
 if (csvPaletteColors.size > 0 && designColors.size > 0) {
   const invented = [...designColors].filter((color) => {
     if (csvPaletteColors.has(color)) return false;
+    if (allowedNonCsvColors.has(color)) return false;
     // Allow common dark-mode surface colors (blacks, dark grays, whites)
     if (/^#(0[0-9a-f]{5}|1[0-9a-f]{5}|2[0-9a-f]{5}|f[0-9a-f]{5}|e[0-9a-f]{5})$/i.test(color)) return false;
     return true;
   });
   if (invented.length > 0) {
-    blocking.push(`DESIGN.md colors not in CSV palette: ${invented.join(", ")} (agent invented these, not from colors.csv)`);
+    blocking.push(`DESIGN.md colors not in CSV palette or documented user/brand derivation: ${invented.join(", ")}`);
   }
 }
 
@@ -268,6 +288,7 @@ for (const [layout, count] of layoutCounts.entries()) console.log(`  ${layout}: 
 console.log("\nDESIGN COLORS:");
 printSet("DESIGN.md", designColors);
 printSet("src", usedColors);
+printSet("allowed non-CSV", allowedNonCsvColors);
 
 console.log("\nTYPOGRAPHY AND SPACING:");
 printSet("font sizes", fontSizes);

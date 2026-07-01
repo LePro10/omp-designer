@@ -88,7 +88,7 @@ Silent skipping is not acceptable. Every attempt must appear in the plan.
 
 ## STEP 5: Design tokens
 
-Palette: ${CSV_DATA_ROOT}/colors.csv - pick by row number and product type. Copy exact hex values.
+Palette: ${CSV_DATA_ROOT}/colors.csv is the default source. If the user provides brand colors, preserve them. Any non-CSV color must appear as Source: user in PRODUCT.md or as a documented derivation in DESIGN.md.
 Typography: ${CSV_DATA_ROOT}/typography.csv - pick by row number. Copy exact font names.
 Avoid: Inter, Roboto, Geist, Plus Jakarta Sans, Space Grotesk (overused).
 Write DESIGN.md with all tokens before building any component.
