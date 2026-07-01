@@ -1,25 +1,39 @@
 #!/usr/bin/env node
 /**
- * fix-ai-slop.mjs - deterministic post-processing for common AI design tells.
+ * fix-ai-slop.mjs - deterministic anti-slop lint/fix tool.
  *
  * Usage:
- *   node fix-ai-slop.mjs src/
+ *   node fix-ai-slop.mjs [--check] <dir>   # read-only validation (default)
+ *   node fix-ai-slop.mjs --fix <dir>       # deterministic text fixes, then validation
  *
- * Auto-fixes:
+ * Default mode is intentionally read-only. Validation must not silently mutate
+ * release candidates; run --fix explicitly when you want safe rewrites.
+ *
+ * Auto-fixes with --fix:
  * - Em-dashes in code/text files.
  *
  * Fails on:
- * - Buzzwords
+ * - Em-dashes in --check mode
+ * - Buzzwords outside avoidance-context documentation
  * - Fake precision numbers
  * - Fake/real-company social proof
  * - AI-slop colors
  * - Common LLM copy patterns
  * - Unsourced stock-photo hotlinks
+ * - Unsupported EVIDENCE.md claims used in output
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, extname, dirname, basename } from "node:path";
 
-const targetDir = process.argv[2] || "src";
+const args = process.argv.slice(2);
+const mode = args.includes("--fix") ? "fix" : "check";
+const targetDir = args.find((arg) => !arg.startsWith("--")) || "src";
+
+if (args.includes("--help") || args.includes("-h")) {
+  console.log("Usage: node fix-ai-slop.mjs [--check] [--fix] <dir>");
+  process.exit(0);
+}
+
 const TEXT_EXTENSIONS = new Set([".tsx", ".ts", ".jsx", ".js", ".css", ".html", ".md"]);
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", ".next", "build", "coverage"]);
 
@@ -66,8 +80,6 @@ const COMPOUND_FONT_EXCEPTIONS = [
   "Space Mono"
 ];
 
-
-
 const COPY_PATTERNS = [
   { label: "not-just-but", regex: /not\s+just\s+[^\n.]+,?\s+but\s+[^\n.]+/gi },
   { label: "whether-you-are", regex: /whether\s+you(?:'re|\s+are)\s+[^\n.]+\s+or\s+[^\n.]+/gi },
@@ -77,7 +89,7 @@ const COPY_PATTERNS = [
 
 const FAKE_NUMBER_PATTERNS = [
   { label: "percentage", regex: /\b\d+(?:\.\d+)?\s?%\b/g },
-  { label: "multiplier", regex: /\b\d+(?:\.\d+)?x\b/gi },
+  { label: "multiplier", regex: /\b\d+(?:\.\d+)?\s?x\b/gi },
   { label: "large-count", regex: /\b\d[\d,]*(?:\+)?\s+(?:teams|users|customers|companies|startups|developers|creators|projects|tasks|workflows|hours|days|weeks|months|years|conditions|hospitals|clinics|schools|stores|orders|deployments|laureates|awards|countries|cities)\b/gi },
   { label: "roi", regex: /\b\d+(?:\.\d+)?\s?(?:roi|return|adoption|retention|conversion|uptime)\b/gi }
 ];
@@ -174,10 +186,14 @@ function fixEmDashes(content) {
   return { content: fixed, count: before === fixed ? 0 : before.split("—").length - fixed.split("—").length };
 }
 
+function detectEmDashes(content) {
+  return collectMatches(content, /—/g, "em-dash");
+}
+
 function detectBuzzwords(content) {
   const results = [];
   const lines = content.split("\n");
-  const avoidanceMarkers = /anti.?pattern|avoid|what to (avoid|not)|not (use|default|allowed)|ban|forbidden|never use|do not use|MUST NOT|instead of|rather than|replace with|instead:/i;
+  const avoidanceMarkers = /anti.?pattern|avoid|what to (avoid|not)|not (use|default|allowed)|ban|forbidden|never use|do not use|MUST NOT|instead of|rather than|replace with|instead:|overused/i;
   for (const word of BUZZWORDS) {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(`\\b${escaped}\\b`, "gi");
@@ -255,7 +271,7 @@ function detectOverusedFonts(content) {
 
   return OVERUSED_FONTS.flatMap((font) => {
     const escaped = font.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "[+\\s]+");
-    const regex = new RegExp(`(?:family=${escaped}|font-family[^;\\n]*${escaped}|['"]${escaped}['"]|\\b${escaped}\\b)`, "gi");
+    const regex = new RegExp(`(?:family=${escaped}|font-family[^;\n]*${escaped}|['"]${escaped}['"]|\\b${escaped}\\b)`, "gi");
     return collectMatches(content, regex, `overused-font:${font}`).filter((m) => {
       if (okLines.has(m.line)) return false;
       const line = lines[m.line - 1] || "";
@@ -274,7 +290,7 @@ function printIssues(file, issues) {
   if (issues.length > 20) console.log(`    ... ${issues.length - 20} more`);
 }
 
-console.log(`\nScanning ${targetDir}/ for AI slop...\n`);
+console.log(`\nScanning ${targetDir}/ for AI slop (${mode} mode)...\n`);
 
 let files = [];
 try {
@@ -296,23 +312,28 @@ let totalIssues = 0;
 for (const file of files) {
   const original = readFileSync(file, "utf-8");
   const fixed = fixEmDashes(original);
+  const contentForChecks = mode === "fix" ? fixed.content : original;
+
   if (fixed.count > 0) {
-    writeFileSync(file, fixed.content);
     totalEmDashes += fixed.count;
-    console.log(`  fixed ${fixed.count} em-dash(es) in ${file}`);
+    if (mode === "fix") {
+      writeFileSync(file, fixed.content);
+      console.log(`  fixed ${fixed.count} em-dash(es) in ${file}`);
+    }
   }
 
   const issues = removeSourcedFactualIssues([
-    ...detectBuzzwords(fixed.content),
-    ...detectFakeNumbers(fixed.content),
-    ...detectCurrency(fixed.content),
-    ...detectCompanies(fixed.content),
-    ...detectSlopColors(fixed.content),
-    ...detectCopyPatterns(fixed.content),
-    ...detectStockPhotoHotlinks(fixed.content),
-    ...detectOverusedFonts(fixed.content),
-    ...(basename(file) !== "EVIDENCE.md" && basename(file) !== "PRODUCT.md" ? detectUnsupportedEvidenceClaims(fixed.content, evidence) : []),
-    ...(basename(file) !== "EVIDENCE.md" ? detectCommerceClaims(fixed.content) : []),
+    ...(mode === "check" ? detectEmDashes(original) : []),
+    ...detectBuzzwords(contentForChecks),
+    ...detectFakeNumbers(contentForChecks),
+    ...detectCurrency(contentForChecks),
+    ...detectCompanies(contentForChecks),
+    ...detectSlopColors(contentForChecks),
+    ...detectCopyPatterns(contentForChecks),
+    ...detectStockPhotoHotlinks(contentForChecks),
+    ...detectOverusedFonts(contentForChecks),
+    ...(basename(file) !== "EVIDENCE.md" && basename(file) !== "PRODUCT.md" ? detectUnsupportedEvidenceClaims(contentForChecks, evidence) : []),
+    ...(basename(file) !== "EVIDENCE.md" ? detectCommerceClaims(contentForChecks) : []),
   ], productFacts);
 
   printIssues(file, issues);
@@ -321,7 +342,7 @@ for (const file of files) {
 
 console.log("\nSummary:");
 console.log(`  Files scanned: ${files.length}`);
-console.log(`  Em-dashes fixed: ${totalEmDashes}`);
+console.log(`  Em-dashes ${mode === "fix" ? "fixed" : "found"}: ${totalEmDashes}`);
 console.log(`  Blocking issues found: ${totalIssues}`);
 
 if (totalIssues === 0) {
@@ -329,5 +350,7 @@ if (totalIssues === 0) {
   process.exit(0);
 }
 
-console.log("\nFix the blocking issues above and rerun.\n");
+console.log(mode === "check"
+  ? "\nFix the blocking issues or rerun with --fix for deterministic em-dash cleanup.\n"
+  : "\nFix the remaining blocking issues above and rerun.\n");
 process.exit(1);

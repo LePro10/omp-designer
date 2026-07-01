@@ -9,8 +9,8 @@
 ## What this is
 
 `omp-designer` is a toggleable `/designer` extension for [Pi](https://pi.dev) and [oh-my-pi](https://github.com/can1357/oh-my-pi) that loads
-5 design skills + 4 MCP integrations. It turns any coding agent into a UI/UX design
-specialist with anti-AI-slop enforcement.
+12 design skills + 4 MCP integrations. It turns any coding agent into a UI/UX design
+specialist with anti-AI-slop enforcement, EVIDENCE.md truth tracking, and deterministic validators.
 
 ## Step 0: Check prerequisites
 
@@ -160,6 +160,8 @@ After setup, ask the user to:
 ## What NOT to do
 
 - NEVER guess API keys or tokens
+- NEVER paste npm tokens, API keys, auth headers, or `.env` values into chat or CLI arguments
+- NEVER publish without running `npm run check:release`
 - NEVER hardcode the user's home directory paths — use `~` or ask
 - NEVER skip the MCP configuration step
 - NEVER modify the skill files in `skills/`
@@ -171,19 +173,27 @@ After setup, ask the user to:
 omp-designer/
 ├── extensions/designer.ts    # Pi extension (pi.dev API)
 ├── extension/index.ts        # omp extension (oh-my-pi API)
-├── skills/                   # Auto-discovered design skills
+├── skills/                   # 12 auto-discovered design skills
+│   ├── ai-slop.md            # Canonical anti-slop reference
 │   ├── designer-master.md    # 8-step orchestration workflow
-│   ├── taste-skill.md        # Anti-slop rules + 50-point pre-flight
+│   ├── product-md.md         # PRODUCT.md + EVIDENCE.md workflow
+│   ├── design-md.md          # Design system spec
+│   ├── taste-skill.md        # Anti-slop rules + pre-flight
+│   ├── ui-ux-pro-max.md      # CSV design intelligence instructions
+│   ├── copywriting.md        # Human copy rules
 │   ├── animate.md            # Animation patterns and easing
-│   ├── ui-ux-pro-max.md      # Design intelligence instructions
+│   ├── scroll-choreography.md # Narrative scroll patterns
+│   ├── reference-study.md    # Reference study protocol
+│   ├── visual-critique.md    # Screenshot and mobile QA
 │   └── review-skill.md       # Post-build audit
 ├── data/ui-ux-pro-max/       # 1.7 MB CSV design database
-│   ├── design.csv            # 161 color palettes
+│   ├── colors.csv            # 161 color palettes
 │   ├── typography.csv        # 57 font pairings
-│   ├── colors.csv            # 31 KB color data
-│   ├── styles.csv            # 67 UI styles
-│   ├── ux-guidelines.csv     # 99 UX rules
-│   └── stacks/               # Per-framework configs
+│   └── ...                   # styles, UX guidelines, framework stacks
+├── scripts/
+│   ├── fix-ai-slop.mjs       # Read-only lint by default; --fix mutates
+│   ├── analyze-layout.mjs    # Layout, palette, and motion validator
+│   └── check-release.mjs     # Version + secret hygiene release gate
 ├── docs/                     # Architecture, MCP setup, problems
 ├── README.md                 # Human-readable install guide
 └── package.json              # Dual manifest (pi + omp)

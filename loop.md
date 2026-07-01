@@ -30,8 +30,9 @@ omp-designer/
 │   │   └── ...                  ← styles, UX guidelines
 │   └── scroll-templates.tsx     ← 5 reusable scroll patterns
 ├── scripts/
-│   ├── fix-ai-slop.mjs          ← Deterministic anti-slop validator
-│   └── analyze-layout.mjs       ← Layout + palette + motion validator
+│   ├── fix-ai-slop.mjs          ← Read-only anti-slop validator; --fix mutates
+│   ├── analyze-layout.mjs       ← Layout + palette + motion validator
+│   └── check-release.mjs        ← Version + secret hygiene release gate
 ├── test-output/                 ← Test projects
 └── docs/problems.md             ← Known issues + fixes
 ```

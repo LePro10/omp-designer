@@ -193,10 +193,11 @@ Build components following the plan. Use generate_image for hero visuals. If una
 ## STEP 7: Post-build self-check (MANDATORY)
 
 Run from project root:
-1. node ~/.omp/agent/extensions/designer/fix-ai-slop.mjs .
+1. node ~/.omp/agent/extensions/designer/fix-ai-slop.mjs --check .
 2. node ~/.omp/agent/extensions/designer/analyze-layout.mjs .
 3. npm run build
 4. npx -y impeccable detect src/ if available
+For em-dashes only, run node ~/.omp/agent/extensions/designer/fix-ai-slop.mjs --fix . and then rerun --check.
 
 If ANY reports issues: fix and rerun. Take section viewport screenshots (hero, features, conversion, footer). Scroll top to bottom before screenshots.
 

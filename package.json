@@ -1,8 +1,8 @@
 {
   "name": "omp-designer",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "type": "module",
-  "description": "Autonomous AI design system — 9 skills, 161 palettes, 57 font pairings, zero AI tells. Takes a brief and produces production-ready websites.",
+  "description": "Autonomous AI design system with 12 skills, evidence tracking, deterministic validators, 161 palettes, and 57 font pairings.",
   "keywords": [
     "pi-package",
     "pi",
@@ -45,6 +45,11 @@
     "AGENTS.md",
     "package.json"
   ],
+  "scripts": {
+    "test:validators": "node scripts/__tests__/fix-ai-slop.test.mjs",
+    "check:release": "node scripts/check-release.mjs",
+    "prepublishOnly": "npm run check:release && npm run test:validators"
+  },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "typescript": "^6.0.3"

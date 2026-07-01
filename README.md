@@ -105,8 +105,8 @@ User: "build me a website about AI"
 - **ai-slop.md** (679 lines) — the single source of truth for what constitutes AI slop
 
 ### Deterministic validators
-- **fix-ai-slop.mjs** — catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims, overused fonts, commerce claims
-- **analyze-layout.mjs** — catches off-palette colors, motion timing issues, layout problems, CSV palette validation
+- **fix-ai-slop.mjs** — read-only by default (`--check`); catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims, overused fonts, commerce claims. Use `--fix` only for deterministic em-dash cleanup.
+- **analyze-layout.mjs** — read-only; catches off-palette colors, motion timing issues, layout problems, CSV palette validation.
 
 ### Evaluation framework
 - **14 dimensions** scored 0-4 (product grounding, truthfulness, specificity, narrative, composition, system coherence, copy, imagery, motion, accessibility, responsiveness, functional completeness, distinctiveness)
@@ -138,8 +138,9 @@ omp-designer/
 │   ├── ui-ux-pro-max/           # 1.7MB design database (CSVs)
 │   └── scroll-templates.tsx     # Reusable scroll patterns
 ├── scripts/
-│   ├── fix-ai-slop.mjs          # Deterministic anti-slop validator
-│   └── analyze-layout.mjs       # Layout + palette + motion validator
+│   ├── fix-ai-slop.mjs          # Read-only anti-slop validator; --fix mutates
+│   ├── analyze-layout.mjs       # Layout + palette + motion validator
+│   └── check-release.mjs        # Version + secret hygiene release gate
 ├── test-output/                 # Test projects
 ├── docs/problems.md             # Known issues + fixes
 └── loop.md                      # Improvement loop
@@ -158,7 +159,7 @@ omp
 # Agent shows plan with MCP research log
 # Type "accept"
 # Agent builds
-# Agent runs fix-ai-slop + analyze-layout
+# Agent runs fix-ai-slop --check + analyze-layout
 # Agent takes section screenshots
 # Agent reports substitution test + rationale test
 ```
