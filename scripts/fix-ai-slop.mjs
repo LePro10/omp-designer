@@ -43,7 +43,12 @@ const BUZZWORDS = [
   "leverage", "leveraging", "synergy", "synergize", "next-gen", "next-generation",
   "game-changing", "best-in-class", "world-class", "robust", "scalable", "holistic",
   "comprehensive", "innovative", "innovation", "transformative", "elevate", "elevate your",
-  "streamline", "streamlined", "paradigm", "foster", "curated", "curate"
+  "streamline", "streamlined", "paradigm", "foster", "curated", "curate",
+  "effortless", "effortlessly", "frictionless", "frictionlessly", "pioneering",
+  "groundbreaking", "next-level", "future-proof", "future-proofing", "bulletproof",
+  "rock-solid", "blazing-fast", "lightning-fast", "world-leading", "industry-leading",
+  "cut above", "second to none", "one-stop", "turnkey", "battle-tested",
+  "mission-critical", "enterprise-grade", "military-grade", "supercharge", "supercharged"
 ];
 
 const REAL_COMPANY_NAMES = [
@@ -89,7 +94,7 @@ const COPY_PATTERNS = [
 
 const FAKE_NUMBER_PATTERNS = [
   { label: "percentage", regex: /\b\d+(?:\.\d+)?\s?%\b/g },
-  { label: "multiplier", regex: /\b\d+(?:\.\d+)?\s?x\b/gi },
+  { label: "multiplier", regex: /\b\d+(?:\.\d+)?\s?[x×](?!\w)/gi },
   { label: "large-count", regex: /\b\d[\d,]*(?:\+)?\s+(?:teams|users|customers|companies|startups|developers|creators|projects|tasks|workflows|hours|days|weeks|months|years|conditions|hospitals|clinics|schools|stores|orders|deployments|laureates|awards|countries|cities)\b/gi },
   { label: "roi", regex: /\b\d+(?:\.\d+)?\s?(?:roi|return|adoption|retention|conversion|uptime)\b/gi }
 ];
@@ -104,6 +109,9 @@ const COMMERCE_CLAIM_PATTERNS = [
   { label: "returns", regex: /\b(?:returns|refunds?|exchanges?)\b/gi },
   { label: "warranty", regex: /\b(?:warranty|guarantee|guaranteed)\b/gi },
 ];
+
+/** Lines matching this are code, not copy — skip commerce claims on them. */
+const CODE_LINE_MARKER = /\b(?:function|const|let|var|export|import|return|interface|type|class)\b|=>|:.*[{;]/;
 
 function walkDir(dir) {
   const files = [];
@@ -182,12 +190,12 @@ function collectMatches(content, regex, label) {
 
 function fixEmDashes(content) {
   const before = content;
-  const fixed = content.replace(/\s—\s/g, ", ").replace(/—/g, ",");
-  return { content: fixed, count: before === fixed ? 0 : before.split("—").length - fixed.split("—").length };
+  const fixed = content.replace(/\s[—–]\s/g, ", ").replace(/[—–]/g, ",");
+  return { content: fixed, count: before === fixed ? 0 : (before.match(/[—–]/g) || []).length - (fixed.match(/[—–]/g) || []).length };
 }
 
 function detectEmDashes(content) {
-  return collectMatches(content, /—/g, "em-dash");
+  return collectMatches(content, /[—–]/g, "em-dash");
 }
 
 function detectBuzzwords(content) {
@@ -252,7 +260,13 @@ function detectStockPhotoHotlinks(content) {
 }
 
 function detectCommerceClaims(content) {
-  return COMMERCE_CLAIM_PATTERNS.flatMap(({ label, regex }) => collectMatches(content, regex, `commerce:${label}`));
+  const lines = content.split("\n");
+  return COMMERCE_CLAIM_PATTERNS.flatMap(({ label, regex }) =>
+    collectMatches(content, regex, `commerce:${label}`).filter((m) => {
+      const line = lines[m.line - 1] || "";
+      return !CODE_LINE_MARKER.test(line);
+    })
+  );
 }
 
 function detectOverusedFonts(content) {

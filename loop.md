@@ -32,7 +32,11 @@ omp-designer/
 ├── scripts/
 │   ├── fix-ai-slop.mjs          ← Read-only anti-slop validator; --fix mutates
 │   ├── analyze-layout.mjs       ← Layout + palette + motion validator
-│   └── check-release.mjs        ← Version + secret hygiene release gate
+│   ├── check-release.mjs        ← Version + secret hygiene release gate
+│   ├── eval-suite.mjs           ← Golden prompt corpus validator/scorer
+│   ├── audit-trace.mjs          ← JSONL run trace auditor
+│   └── __tests__/               ← 30 regression tests (validators, layout, trace, prompt)
+├── eval/                        ← Golden prompt corpus (20 prompts, 15 categories)
 ├── test-output/                 ← Test projects
 └── docs/problems.md             ← Known issues + fixes
 ```
@@ -216,6 +220,80 @@ Look at the actual output. Be honest:
 ### Step 7 — Log what you did
 
 Keep notes. What you changed, why, score before/after. This helps you track what actually works.
+
+## Iteration Log
+
+### Iteration 9 (2026-07-01)
+**Hypothesis:** Adversarial validator testing reveals false negatives; mechanical phase tracking converts text instructions into observable facts.
+**Changes:**
+- Fixed 3 validator bugs: TypeScript `returns` false positive, Unicode `×` multiplier false negative, en-dash `–` detection gap
+- Expanded buzzword list from 40 to 63 entries (added synonyms: effortless, frictionless, pioneering, groundbreaking, etc.)
+- Added 5 adversarial tests (total: 30 tests, was 26)
+- Added mechanical phase tracking: `idle → planning → building → reviewing → validated` based on tool call patterns
+- Phase-aware session_stop validation reports current phase when validation fails
+- Doctor command shows phase, files written, validators run
+- Synced AGENTS.md, docs/problems.md
+**Result:** All 30 tests pass. Release gate passes. TypeScript compiles clean.
+**Status:** Changes NOT committed, NOT published (npm auth blocked).
+
+### Iteration 8 (2026-06-30)
+**Hypothesis:** EVIDENCE.md documentation sections trigger false positives for buzzwords and commerce claims.
+**Changes:**
+- Buzzword/font detectors skip avoidance context lines
+- EVIDENCE.md/PRODUCT.md excluded from evidence/commerce scanning
+- Confidence-zero claims blocked when used in source
+**Result:** 26 tests pass.
+
+### Iteration 7 (2026-06-30)
+**Hypothesis:** Conflicting "always Grill Me" rules cause inconsistent behavior.
+**Changes:**
+- 4 explicit interaction modes: Guided, Adaptive, Autonomous, Batch
+- Prompt contract tests guard against drift
+**Result:** 8 prompt contract tests pass.
+
+### Iteration 6 (2026-06-30)
+**Hypothesis:** Complex layouts need tablet breakpoint coverage.
+**Changes:**
+- `hasTabletBreakpoint()` in analyze-layout.mjs
+- Complex grids require explicit `lg:` breakpoint handling
+**Result:** 5 layout tests pass.
+
+### Iteration 5 (2026-06-30)
+**Hypothesis:** CSV palette rules are too rigid — user brand colors should be allowed.
+**Changes:**
+- `readAllowedNonCsvColors()` reads Source:user hex colors from PRODUCT.md/DESIGN.md
+- Common surface colors still allowed
+**Result:** 3 layout tests for brand color logic.
+
+### Iteration 4 (2026-06-30)
+**Hypothesis:** Need reproducible regression testing.
+**Changes:**
+- Golden prompt corpus: `eval/prompts.jsonl` (20 prompts, 15 categories)
+- Eval harness: `eval-suite.mjs`
+- Trace audit: `audit-trace.mjs`
+**Result:** Corpus validation passes.
+
+### Iteration 3 (2026-06-30)
+**Hypothesis:** Agent forgets to run post-build validators.
+**Changes:**
+- `session_stop` hook auto-runs `fix-ai-slop --check` + `analyze-layout`
+- Internal continuation on failure (blocks shipping)
+**Result:** Auto-validation traced in JSONL.
+
+### Iteration 2 (2026-06-30)
+**Hypothesis:** No observability into what the agent actually did.
+**Changes:**
+- JSONL run trace in extension
+- `/designer-doctor` command
+**Result:** Trace events: designer_enabled/disabled, skills_discovered, prompt_injected, agent_start/end, tool_call/result.
+
+### Iteration 1 (2026-06-30)
+**Hypothesis:** Validator scripts mutate files during read-only checks.
+**Changes:**
+- `fix-ai-slop.mjs` default mode is `--check` (read-only); `--fix` is explicit
+- `check-release.mjs` release gate
+- 7 validator regression tests
+**Result:** 7 tests pass. Release gate passes.
 
 ## Testing notes
 
