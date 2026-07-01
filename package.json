@@ -48,10 +48,11 @@
   ],
   "scripts": {
     "test:validators": "node scripts/__tests__/fix-ai-slop.test.mjs",
+    "test:layout": "node scripts/__tests__/analyze-layout.test.mjs",
     "test:trace": "node scripts/__tests__/audit-trace.test.mjs",
     "test:eval": "node scripts/eval-suite.mjs validate",
     "check:release": "node scripts/check-release.mjs",
-    "prepublishOnly": "npm run check:release && npm run test:validators && npm run test:trace && npm run test:eval"
+    "prepublishOnly": "npm run check:release && npm run test:validators && npm run test:layout && npm run test:trace && npm run test:eval"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

@@ -106,7 +106,7 @@ User: "build me a website about AI"
 
 ### Deterministic validators
 - **fix-ai-slop.mjs** — read-only by default (`--check`); catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims, overused fonts, commerce claims. Use `--fix` only for deterministic em-dash cleanup.
-- **analyze-layout.mjs** — read-only; catches off-palette colors, motion timing issues, layout problems, CSV palette validation.
+- **analyze-layout.mjs** — read-only; catches off-palette source colors, motion timing issues, layout problems, CSV palette validation, and allows user-provided brand colors/documented derivations.
 - **Automatic session-stop gate** — in omp, designer mode runs both validators automatically before the final assistant response when the current directory looks like a generated project. Blocking issues force an internal continuation instead of shipping.
 
 ### Evaluation framework
