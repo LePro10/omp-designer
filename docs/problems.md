@@ -32,14 +32,15 @@
 - [x] **Release gate** — `check-release.mjs` validates version/docs and scans for likely secrets
 - [x] **Run trace** — omp extension writes JSONL telemetry for prompt injection, skill discovery, agent/tool lifecycle
 - [x] **Doctor command** — `/designer-doctor` reports source/install/skill/MCP/trace health
+- [x] **Session-stop validation gate** — omp automatically runs `fix-ai-slop --check` and `analyze-layout` before final responses for generated projects
 
 ---
 
 ## REMAINING
 
-### P1: Agent still skips post-build scripts sometimes
+### P1: Agent still skips manual post-build scripts sometimes
 The PROMPT_INJECT says "MANDATORY" but the agent selectively ignores when context is long.
-**Status:** Still not structurally blocked, but run traces now show whether validator/build commands actually ran.
+**Status:** Structurally mitigated in omp: `session_stop` now runs the two deterministic validators automatically. Build/browser checks still depend on agent/tool execution.
 
 ### P2: MCP research still skipped when MCPs are unavailable
 Need stronger fallback behavior — agent should use web_search or browser.

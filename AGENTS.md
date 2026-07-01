@@ -211,6 +211,10 @@ omp-designer/
 - Run `/designer-doctor`
 - Check installed extension hash, script presence, managed skill count, MCP status, and trace path
 
+**Agent says done but may have skipped validation?**
+- In omp designer mode, `session_stop` automatically runs `fix-ai-slop --check` and `analyze-layout` for generated projects
+- Check `/designer-doctor` trace path for `auto_validation_started` and `auto_validation_passed`
+
 **Chrome errors in log?**
 - Add `--chrome-arg=--disable-logging --chrome-arg=--log-level=3` to chrome-devtools args
 - These are harmless Chromium internal messages, not from the designer package
