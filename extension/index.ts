@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 const HOME = homedir();
 const STATE_FILE = join(HOME, ".omp", "agent", "designer-state.json");
@@ -365,6 +366,56 @@ function buildDoctorReport(cwd: string): string {
   return lines.join("\n");
 }
 
+function looksLikeDesignerProject(cwd: string): boolean {
+  const hasDesignArtifact =
+    existsSync(join(cwd, "DESIGN.md")) ||
+    existsSync(join(cwd, "PRODUCT.md")) ||
+    existsSync(join(cwd, "EVIDENCE.md"));
+  const hasAppSurface = existsSync(join(cwd, "src")) || existsSync(join(cwd, "package.json"));
+  return hasDesignArtifact && hasAppSurface;
+}
+
+function truncateForContext(text: string): string {
+  const max = 6000;
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n...[truncated ${text.length - max} chars]`;
+}
+
+function runNodeValidator(scriptPath: string, args: string[], cwd: string): { ok: boolean; output: string } {
+  if (!existsSync(scriptPath)) {
+    return { ok: false, output: `Missing validator: ${scriptPath}` };
+  }
+  const result = spawnSync(process.execPath, [scriptPath, ...args], {
+    cwd,
+    encoding: "utf-8",
+    timeout: 45_000,
+    maxBuffer: 1024 * 1024,
+  });
+  const stdout = typeof result.stdout === "string" ? result.stdout : "";
+  const stderr = typeof result.stderr === "string" ? result.stderr : "";
+  const output = `${stdout}${stderr}`.trim();
+  if (result.error) {
+    return { ok: false, output: result.error.message };
+  }
+  return { ok: result.status === 0, output };
+}
+
+function runSessionStopValidation(cwd: string): { ok: true; skipped?: string } | { ok: false; output: string } {
+  if (!looksLikeDesignerProject(cwd)) {
+    return { ok: true, skipped: "no DESIGN.md/PRODUCT.md/EVIDENCE.md project artifacts" };
+  }
+
+  const quality = runNodeValidator(QUALITY_SCRIPT, ["--check", "."], cwd);
+  const layout = runNodeValidator(LAYOUT_SCRIPT, ["."], cwd);
+  const failures = [
+    quality.ok ? "" : `fix-ai-slop --check failed:\n${quality.output}`,
+    layout.ok ? "" : `analyze-layout failed:\n${layout.output}`,
+  ].filter(Boolean);
+
+  if (failures.length === 0) return { ok: true };
+  return { ok: false, output: truncateForContext(failures.join("\n\n")) };
+}
+
 interface CommandContext {
   ui?: { notify?: (msg: string, level: string) => void };
   editor?: { setText?: (text: string) => void };
@@ -447,5 +498,32 @@ export default function (pi: ExtensionAPI): void {
 
   pi.on("tool_result", (event?: unknown, ctx?: { cwd?: string }) => {
     writeTrace(ctx?.cwd, "tool_result", summarizeToolEvent(event, ctx?.cwd));
+  });
+
+  pi.on("session_stop", (_event?: unknown, ctx?: { cwd?: string }) => {
+    if (!isOn(ctx?.cwd)) return;
+    const cwd = ctx?.cwd ?? process.cwd();
+    writeTrace(cwd, "auto_validation_started");
+    const validation = runSessionStopValidation(cwd);
+    if (validation.ok) {
+      writeTrace(cwd, "auto_validation_passed", validation.skipped ? { skipped: validation.skipped } : {});
+      return;
+    }
+
+    writeTrace(cwd, "auto_validation_failed");
+    return {
+      continue: true,
+      additionalContext: [
+        "[DESIGNER AUTO-VALIDATION FAILED]",
+        "Before answering the user, fix these blocking issues and rerun validation from the project root.",
+        "",
+        validation.output,
+        "",
+        "Required commands after fixes:",
+        `node ${QUALITY_SCRIPT} --check .`,
+        `node ${LAYOUT_SCRIPT} .`,
+        "[/DESIGNER AUTO-VALIDATION FAILED]",
+      ].join("\n"),
+    };
   });
 }

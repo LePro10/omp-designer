@@ -107,6 +107,7 @@ User: "build me a website about AI"
 ### Deterministic validators
 - **fix-ai-slop.mjs** — read-only by default (`--check`); catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims, overused fonts, commerce claims. Use `--fix` only for deterministic em-dash cleanup.
 - **analyze-layout.mjs** — read-only; catches off-palette colors, motion timing issues, layout problems, CSV palette validation.
+- **Automatic session-stop gate** — in omp, designer mode runs both validators automatically before the final assistant response when the current directory looks like a generated project. Blocking issues force an internal continuation instead of shipping.
 
 ### Evaluation framework
 - **14 dimensions** scored 0-4 (product grounding, truthfulness, specificity, narrative, composition, system coherence, copy, imagery, motion, accessibility, responsiveness, functional completeness, distinctiveness)
@@ -115,7 +116,7 @@ User: "build me a website about AI"
 
 ### Observability
 - **Run trace** — when designer mode is enabled, the omp extension writes JSONL events to `~/.omp/agent/designer-traces/<cwd-hash>.jsonl`.
-- **Traced events** — prompt injection, skill discovery, agent start/end, tool calls/results, validator/build command kinds.
+- **Traced events** — prompt injection, skill discovery, agent start/end, tool calls/results, automatic validation start/pass/fail, validator/build command kinds.
 - **Doctor command** — `/designer-doctor` writes source/install/skill/MCP/trace health into the editor.
 
 ---

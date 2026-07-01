@@ -37,7 +37,7 @@ omp-designer/
 └── docs/problems.md             ← Known issues + fixes
 ```
 
-The installed copy lives at `~/.omp/agent/managed-skills/` (skills get copied there on `omp install`). Use `/designer-doctor` to check installed extension/script/skill/MCP state. Designer run traces are JSONL files under `~/.omp/agent/designer-traces/`.
+The installed copy lives at `~/.omp/agent/managed-skills/` (skills get copied there on `omp install`). Use `/designer-doctor` to check installed extension/script/skill/MCP state. Designer run traces are JSONL files under `~/.omp/agent/designer-traces/`. In omp, `session_stop` automatically runs `fix-ai-slop --check` + `analyze-layout` for generated projects before final responses.
 
 ## What you're doing
 
