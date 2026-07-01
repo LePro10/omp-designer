@@ -50,6 +50,9 @@ Iteratively making this system produce **better design output**. You have full f
 - Research what works in other systems and steal the best ideas
 - Add new files, remove dead code, restructure things
 - Run `npx impeccable detect` on test output to catch AI slop
+- Run `npm run test:eval` to validate the golden prompt corpus
+- Use `node scripts/eval-suite.mjs commands --out test-output/eval` for reproducible full-corpus model runs
+- Use `node scripts/audit-trace.mjs <trace.jsonl> --strict` to verify claims about validator/build execution
 
 ## How each round works
 
@@ -111,7 +114,9 @@ omp -p --model <model> --thinking high --max-time 600 \
 write '{"enabled":false}' to ~/.omp/agent/designer-state.json
 ```
 
-**Why this works:** When `designer-state.json` is `true`, the extension's `before_agent_start` hook fires and injects the full PROMPT_INJECT + loads all 5 skills. The `omp -p` process gets this because it starts a fresh agent session while the state is `true`. Setting it back to `false` right after ensures the loop agent (you) doesn't get polluted on its next turn.
+**Why this works:** When `designer-state.json` is `true`, the extension's `before_agent_start` hook fires and injects PROMPT_INJECT while `resources_discover` exposes the managed skill files. The `omp -p` process gets this because it starts a fresh agent session while the state is `true`. Setting it back to `false` right after ensures the loop agent (you) doesn't get polluted on its next turn.
+
+For regression rounds, don't invent a fresh one-off prompt first. Start with `eval/prompts.jsonl`, then add a new prompt only if it captures a new failure class.
 
 ### Realistic test prompts (use these, not sanitized briefs)
 

@@ -194,7 +194,10 @@ omp-designer/
 ├── scripts/
 │   ├── fix-ai-slop.mjs       # Read-only lint by default; --fix mutates
 │   ├── analyze-layout.mjs    # Layout, palette, and motion validator
-│   └── check-release.mjs     # Version + secret hygiene release gate
+│   ├── check-release.mjs     # Version + secret hygiene release gate
+│   ├── eval-suite.mjs        # Golden prompt corpus validator/scorer
+│   └── audit-trace.mjs       # JSONL run trace auditor
+├── eval/                      # Golden prompt corpus + fixtures
 ├── docs/                     # Architecture, MCP setup, problems
 ├── README.md                 # Human-readable install guide
 └── package.json              # Dual manifest (pi + omp)
