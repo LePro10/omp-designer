@@ -8,3 +8,5 @@ REDDIT_POST.md
 test-output/
 *.png
 *.webp
+omp-session-*.html
+bun.lock

@@ -101,12 +101,13 @@ Build all components following the plan. For each section:
 
 Before declaring done, run ALL of these from the project root:
 
-1. node ${QUALITY_SCRIPT} .  -- catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims
-2. node ${LAYOUT_SCRIPT} .  -- catches off-palette colors, motion timing issues, layout problems
+1. node ${QUALITY_SCRIPT} --check .  -- read-only: catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims
+2. node ${LAYOUT_SCRIPT} .  -- read-only: catches off-palette colors, motion timing issues, layout problems
 3. npm run build  -- catches type errors and build failures
 4. npx -y impeccable detect src/  -- catches gradient-text, ai-color-palette, em-dashes (if available)
 
 If ANY command reports issues: fix and rerun. Do not declare done with blocking issues.
+For em-dashes only, run node ${QUALITY_SCRIPT} --fix . and then rerun --check.
 
 Then take screenshots:
 - Desktop full page
