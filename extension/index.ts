@@ -6,8 +6,9 @@
  */
 
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { join, relative } from "node:path";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const HOME = homedir();
 const STATE_FILE = join(HOME, ".omp", "agent", "designer-state.json");
@@ -16,6 +17,7 @@ const EXTENSION_ROOT = join(HOME, ".omp", "agent", "extensions", "designer");
 const CSV_DATA_ROOT = join(SKILLS_ROOT, "ui-ux-pro-max-skill", "src", "ui-ux-pro-max", "data");
 const QUALITY_SCRIPT = join(EXTENSION_ROOT, "fix-ai-slop.mjs");
 const LAYOUT_SCRIPT = join(EXTENSION_ROOT, "analyze-layout.mjs");
+const TRACE_DIR = join(HOME, ".omp", "agent", "designer-traces");
 
 const DESIGNER_MARKER_PATTERN = /\[DESIGNER MODE(?: v\d+)?: ACTIVE\]/;
 const GLOBAL_STATE_KEY = "*";
@@ -243,6 +245,126 @@ function withoutDesignerPrompts(prompts: string[]): string[] {
   return cleaned;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+function tracePathForCwd(cwd?: string): string {
+  const activeCwd = cwd ?? process.cwd();
+  const basename = activeCwd.split("/").filter(Boolean).pop() ?? "root";
+  return join(TRACE_DIR, `${basename}-${shortHash(activeCwd)}.jsonl`);
+}
+
+function safePath(path: unknown, cwd?: string): string | undefined {
+  if (typeof path !== "string") return undefined;
+  const activeCwd = cwd ?? process.cwd();
+  if (path.startsWith(activeCwd)) return relative(activeCwd, path) || ".";
+  if (path.startsWith(HOME)) return `~/${relative(HOME, path)}`;
+  return path;
+}
+
+function commandKind(command: unknown): string | undefined {
+  if (typeof command !== "string") return undefined;
+  if (command.includes("fix-ai-slop.mjs")) return "fix-ai-slop";
+  if (command.includes("analyze-layout.mjs")) return "analyze-layout";
+  if (command.includes("npm run build")) return "npm-run-build";
+  if (command.includes("bun run build")) return "bun-run-build";
+  if (command.includes("impeccable detect")) return "impeccable-detect";
+  return command.trim().split(/\s+/)[0];
+}
+
+function writeTrace(cwd: string | undefined, event: string, details: Record<string, unknown> = {}): void {
+  try {
+    if (!isOn(cwd) && event !== "designer_disabled") return;
+    mkdirSync(TRACE_DIR, { recursive: true });
+    const entry = {
+      timestamp: new Date().toISOString(),
+      event,
+      cwd: cwd ?? process.cwd(),
+      ...details,
+    };
+    appendFileSync(tracePathForCwd(cwd), JSON.stringify(entry) + "\n");
+  } catch { /* tracing must never break the agent loop */ }
+}
+
+function summarizeToolEvent(event: unknown, cwd?: string): Record<string, unknown> {
+  const record = asRecord(event);
+  const input = asRecord(record.input);
+  const result = asRecord(record.result);
+  const summary: Record<string, unknown> = {};
+  const toolName = typeof record.toolName === "string" ? record.toolName : record.name;
+  if (typeof toolName === "string") summary.tool = toolName;
+  const filePath = input.path ?? input.file ?? input.cwd;
+  const safe = safePath(filePath, cwd);
+  if (safe) summary.path = safe;
+  const kind = commandKind(input.command);
+  if (kind) summary.commandKind = kind;
+  if (typeof record.isError === "boolean") summary.isError = record.isError;
+  if (typeof result.isError === "boolean") summary.isError = result.isError;
+  return summary;
+}
+
+function fileHash(path: string): string {
+  if (!existsSync(path)) return "missing";
+  return shortHash(readFileSync(path, "utf-8"));
+}
+
+function packageVersion(cwd: string): string {
+  const cwdPackage = join(cwd, "package.json");
+  if (existsSync(cwdPackage)) {
+    try {
+      const parsed = JSON.parse(readFileSync(cwdPackage, "utf-8")) as Record<string, unknown>;
+      if (typeof parsed.version === "string") return parsed.version;
+    } catch {}
+  }
+  const extensionPackage = join(EXTENSION_ROOT, "package.json");
+  if (existsSync(extensionPackage)) {
+    try {
+      const parsed = JSON.parse(readFileSync(extensionPackage, "utf-8")) as Record<string, unknown>;
+      if (typeof parsed.version === "string") return parsed.version;
+    } catch {}
+  }
+  return "unknown";
+}
+
+function mcpStatus(): string {
+  try {
+    if (!existsSync(MCP_CONFIG)) return "missing";
+    const raw = JSON.parse(readFileSync(MCP_CONFIG, "utf-8")) as Record<string, unknown>;
+    const servers = asRecord(raw.mcpServers);
+    const enabled = Object.entries(servers)
+      .filter(([name, server]) => DESIGNER_MCP_NAMES[name] === true && asRecord(server).enabled === true)
+      .map(([name]) => name);
+    return `${enabled.length}/4 enabled${enabled.length > 0 ? ` (${enabled.join(", ")})` : ""}`;
+  } catch {
+    return "invalid";
+  }
+}
+
+function buildDoctorReport(cwd: string): string {
+  const skillsFound = SKILL_PATHS.filter((path) => existsSync(path)).length;
+  const tracePath = tracePathForCwd(cwd);
+  const lines = [
+    "Designer doctor",
+    "",
+    `Source/package version: ${packageVersion(cwd)}`,
+    `Designer mode for cwd: ${isOn(cwd) ? "enabled" : "disabled"}`,
+    `Installed extension hash: ${fileHash(join(EXTENSION_ROOT, "index.ts"))}`,
+    `Installed fix-ai-slop: ${existsSync(QUALITY_SCRIPT) ? "present" : "missing"} (${fileHash(QUALITY_SCRIPT)})`,
+    `Installed analyze-layout: ${existsSync(LAYOUT_SCRIPT) ? "present" : "missing"} (${fileHash(LAYOUT_SCRIPT)})`,
+    `Managed skills found: ${skillsFound}/${SKILL_PATHS.length}`,
+    `MCP config: ${mcpStatus()}`,
+    `Trace file: ${tracePath}`,
+    "",
+    "Release gate: run npm run check:release && npm run test:validators from the source repo.",
+  ];
+  return lines.join("\n");
+}
+
 interface CommandContext {
   ui?: { notify?: (msg: string, level: string) => void };
   editor?: { setText?: (text: string) => void };
@@ -261,8 +383,7 @@ interface ExtensionAPI {
     name: string,
     opts: { description: string; aliases?: string[]; handler: (args: unknown, ctx: CommandContext) => void }
   ): void;
-  on(event: "resources_discover", handler: (event?: unknown, ctx?: { cwd?: string }) => ResourceDiscoverResult | undefined): void;
-  on(event: "before_agent_start", handler: (event: AgentStartEvent, ctx?: { cwd?: string }) => { systemPrompt: string[] } | undefined): void;
+  on(event: string, handler: (event?: unknown, ctx?: { cwd?: string }) => unknown): void;
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -276,6 +397,7 @@ export default function (pi: ExtensionAPI): void {
     handler: (_args: unknown, ctx: CommandContext) => {
       const cwd = process.cwd();
       const nowOn = toggle(cwd);
+      writeTrace(cwd, nowOn ? "designer_enabled" : "designer_disabled");
       ctx?.ui?.notify?.(
         nowOn ? "DESIGNER MODE ON -- skills loaded, MCPs enabled. Run /reload to activate MCPs." : "DESIGNER MODE OFF",
         "info"
@@ -284,14 +406,46 @@ export default function (pi: ExtensionAPI): void {
     },
   });
 
-  pi.on("resources_discover", (_event?: unknown, ctx?: { cwd?: string }) => {
-    if (!isOn(ctx?.cwd)) return;
-    return { skillPaths: SKILL_PATHS.filter((path) => existsSync(path)) };
+  pi.registerCommand("designer-doctor", {
+    description: "Show designer source/install/trace health",
+    aliases: ["design-doctor"],
+    handler: (_args: unknown, ctx: CommandContext) => {
+      const cwd = process.cwd();
+      const report = buildDoctorReport(cwd);
+      ctx?.editor?.setText?.(report);
+      ctx?.ui?.notify?.("Designer doctor report written to the editor.", "info");
+      writeTrace(cwd, "doctor_run");
+    },
   });
 
-  pi.on("before_agent_start", (event: AgentStartEvent, ctx?: { cwd?: string }) => {
+  pi.on("resources_discover", (_event?: unknown, ctx?: { cwd?: string }) => {
     if (!isOn(ctx?.cwd)) return;
-    const prompts = withoutDesignerPrompts(normalizePromptList(event?.systemPrompt));
+    const skillPaths = SKILL_PATHS.filter((path) => existsSync(path));
+    writeTrace(ctx?.cwd, "skills_discovered", { count: skillPaths.length, expected: SKILL_PATHS.length });
+    return { skillPaths };
+  });
+
+  pi.on("before_agent_start", (event?: unknown, ctx?: { cwd?: string }) => {
+    if (!isOn(ctx?.cwd)) return;
+    const agentEvent = asRecord(event);
+    const prompts = withoutDesignerPrompts(normalizePromptList(agentEvent.systemPrompt as string | string[] | undefined));
+    writeTrace(ctx?.cwd, "prompt_injected", { skillsExpected: SKILL_PATHS.length });
     return { systemPrompt: [...prompts, PROMPT_INJECT] };
+  });
+
+  pi.on("agent_start", (_event?: unknown, ctx?: { cwd?: string }) => {
+    writeTrace(ctx?.cwd, "agent_start");
+  });
+
+  pi.on("agent_end", (_event?: unknown, ctx?: { cwd?: string }) => {
+    writeTrace(ctx?.cwd, "agent_end");
+  });
+
+  pi.on("tool_call", (event?: unknown, ctx?: { cwd?: string }) => {
+    writeTrace(ctx?.cwd, "tool_call", summarizeToolEvent(event, ctx?.cwd));
+  });
+
+  pi.on("tool_result", (event?: unknown, ctx?: { cwd?: string }) => {
+    writeTrace(ctx?.cwd, "tool_result", summarizeToolEvent(event, ctx?.cwd));
   });
 }

@@ -26,13 +26,20 @@
 - [x] **Post-build self-check** — fix-ai-slop + analyze-layout + build + impeccable
 - [x] **Critical rules embedded** — copy, motion, images, honesty rules from skipped skills
 
+### Mechanical Reliability
+- [x] **fix-ai-slop split** — default `--check` is read-only; `--fix` is explicit
+- [x] **Validator regression tests** — known false positives and one evasion case are now covered
+- [x] **Release gate** — `check-release.mjs` validates version/docs and scans for likely secrets
+- [x] **Run trace** — omp extension writes JSONL telemetry for prompt injection, skill discovery, agent/tool lifecycle
+- [x] **Doctor command** — `/designer-doctor` reports source/install/skill/MCP/trace health
+
 ---
 
 ## REMAINING
 
 ### P1: Agent still skips post-build scripts sometimes
 The PROMPT_INJECT says "MANDATORY" but the agent selectively ignores when context is long.
-**Status:** Rules are embedded in PROMPT_INJECT. Testing.
+**Status:** Still not structurally blocked, but run traces now show whether validator/build commands actually ran.
 
 ### P2: MCP research still skipped when MCPs are unavailable
 Need stronger fallback behavior — agent should use web_search or browser.
