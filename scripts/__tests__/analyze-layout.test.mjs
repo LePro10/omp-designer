@@ -71,6 +71,34 @@ test("blocks undocumented invented design colors", () => {
   }
 });
 
+
+test("blocks complex grids without tablet breakpoint coverage", () => {
+  const dir = fixture({
+    "DESIGN.md": "Palette\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
+    "src/App.tsx": "export default function App(){return <section className=\"grid grid-cols-1 md:grid-cols-3 gap-6\"><h1 className=\"text-sm text-base text-lg text-xl\">Test</h1></section>}",
+  });
+  try {
+    const result = run(dir);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /Complex sections without tablet \(1024px\/lg\) breakpoint coverage/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("allows complex grids with explicit lg tablet breakpoint coverage", () => {
+  const dir = fixture({
+    "DESIGN.md": "Palette\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
+    "src/App.tsx": "export default function App(){return <section className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6\"><h1 className=\"text-sm text-base text-lg text-xl\">Test</h1></section>}",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /tablet=true/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 let failed = 0;
 for (const { name, fn } of cases) {
   try {

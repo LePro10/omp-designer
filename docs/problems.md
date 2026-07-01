@@ -37,6 +37,7 @@
 - [x] **Eval harness** — `eval-suite.mjs` validates corpus coverage, prints reproducible `omp -p` commands, and scores generated outputs with validators
 - [x] **Trace audit** — `audit-trace.mjs` verifies JSONL traces for prompt injection, skill discovery, auto-validation, validator calls, and build calls
 - [x] **Brand color override** — `analyze-layout.mjs` treats CSV as default, but allows Source:user brand colors and documented derivations
+- [x] **Tablet breakpoint coverage** — complex layouts now require explicit 1024px/lg breakpoint handling in `analyze-layout.mjs`
 
 ---
 
