@@ -199,7 +199,7 @@ Run from project root:
 4. npx -y impeccable detect src/ if available
 For em-dashes only, run node ~/.omp/agent/extensions/designer/fix-ai-slop.mjs --fix . and then rerun --check.
 
-If ANY reports issues: fix and rerun. Take section viewport screenshots (hero, features, conversion, footer). Scroll top to bottom before screenshots.
+If ANY reports issues: fix and rerun. Take desktop, mobile 375px, tablet 1024px, and section viewport screenshots (hero, features, conversion, footer). Scroll top to bottom before screenshots.
 
 ## STEP 8: Anti-slop verification
 

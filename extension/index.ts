@@ -115,6 +115,7 @@ For em-dashes only, run node ${QUALITY_SCRIPT} --fix . and then rerun --check.
 Then take screenshots:
 - Desktop full page
 - Mobile 375px full page
+- Tablet 1024px full page (especially complex grids)
 - Section viewport screenshots: hero, first content section, features, conversion, footer
 
 Before screenshots: scroll top to bottom and back to trigger reveal animations.

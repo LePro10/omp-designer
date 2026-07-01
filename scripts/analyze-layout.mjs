@@ -80,7 +80,6 @@ function extractSpacing(content) {
   for (const item of matches) spacing.add(item);
   return spacing;
 }
-
 function detectLayout(content) {
   if (content.includes("sticky") && /h-\[(?:200|300|400)vh\]/.test(content)) return "pinned-scroll";
   if (content.includes("useTransform") && /x\)|translateX|overflow-x/.test(content)) return "horizontal-scroll";
@@ -92,6 +91,10 @@ function detectLayout(content) {
   if (content.includes("overflow-x-auto") || content.includes("overflow-x-scroll")) return "horizontal-scroll";
   if (content.includes("prose") || content.includes("article")) return "editorial";
   return "unknown";
+}
+
+function hasTabletBreakpoint(content) {
+  return /\b(?:lg:|xl:|max-lg:|max-xl:|min-\[1024px\]:|max-\[1024px\]:|@lg:)/.test(content);
 }
 
 function analyzeSections(files) {
@@ -107,6 +110,7 @@ function analyzeSections(files) {
       hasScrollAnimation: content.includes("whileInView") || content.includes("useScroll"),
       hasHover: content.includes("whileHover") || content.includes(":hover"),
       hasResponsive: /\b(?:sm|md|lg|xl):/.test(content),
+      hasTablet: hasTabletBreakpoint(content),
       hasReducedMotion: content.includes("useReducedMotion") || content.includes("prefers-reduced-motion"),
       riskyHorizontal: layout === "horizontal-scroll" && !/(?:md:|max-md|sm:|vertical|stack)/i.test(content),
     });
@@ -274,11 +278,15 @@ if (riskyHorizontal.length > 0) blocking.push(`Horizontal scroll without obvious
 
 const animatedSections = sections.filter((section) => section.hasScrollAnimation || section.hasHover);
 const reducedMotionCoverage = sections.some((section) => section.hasReducedMotion) || srcFiles.some((file) => readFileSync(file, "utf-8").includes("prefers-reduced-motion"));
+
+const tabletRequiredLayouts = new Set(["bento-grid", "multi-column-grid", "horizontal-scroll", "pinned-scroll"]);
+const missingTablet = sections.filter((section) => tabletRequiredLayouts.has(section.layout) && !section.hasTablet);
+if (missingTablet.length > 0) blocking.push(`Complex sections without tablet (1024px/lg) breakpoint coverage: ${missingTablet.map((section) => section.name).join(", ")}`);
 if (animatedSections.length > 0 && !reducedMotionCoverage) warnings.push("Animations detected but no reduced-motion handling found");
 
 console.log("SECTIONS:");
 for (const section of sections) {
-  console.log(`  ${section.name}: ${section.layout} scroll=${section.hasScrollAnimation} hover=${section.hasHover} responsive=${section.hasResponsive}`);
+  console.log(`  ${section.name}: ${section.layout} scroll=${section.hasScrollAnimation} hover=${section.hasHover} responsive=${section.hasResponsive} tablet=${section.hasTablet}`);
 }
 
 console.log("\nLAYOUT VARIETY:");
