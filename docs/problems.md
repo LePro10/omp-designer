@@ -33,6 +33,9 @@
 - [x] **Run trace** — omp extension writes JSONL telemetry for prompt injection, skill discovery, agent/tool lifecycle
 - [x] **Doctor command** — `/designer-doctor` reports source/install/skill/MCP/trace health
 - [x] **Session-stop validation gate** — omp automatically runs `fix-ai-slop --check` and `analyze-layout` before final responses for generated projects
+- [x] **Golden prompt corpus** — `eval/prompts.jsonl` covers 20 fixed prompts including redesign, dashboard, form, checkout, multi-page, mobile, reduced-motion, and adversarial cases
+- [x] **Eval harness** — `eval-suite.mjs` validates corpus coverage, prints reproducible `omp -p` commands, and scores generated outputs with validators
+- [x] **Trace audit** — `audit-trace.mjs` verifies JSONL traces for prompt injection, skill discovery, auto-validation, validator calls, and build calls
 
 ---
 
@@ -61,6 +64,10 @@ Model limitation. Agent can take screenshots but can't evaluate visually.
 ### P6: CSS @import warning
 Tailwind v4 generates CSS with @import after other rules.
 **Status:** Warning only, doesn't break functionality.
+
+### P7: Full corpus is not yet routinely run after every change
+The corpus and scoring harness exist, but generated outputs still require a model run.
+**Status:** `npm run test:eval` validates coverage deterministically; next step is a model-backed runner/CI job.
 
 ---
 

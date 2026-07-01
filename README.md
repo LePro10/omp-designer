@@ -119,6 +119,11 @@ User: "build me a website about AI"
 - **Traced events** — prompt injection, skill discovery, agent start/end, tool calls/results, automatic validation start/pass/fail, validator/build command kinds.
 - **Doctor command** — `/designer-doctor` writes source/install/skill/MCP/trace health into the editor.
 
+### Regression suite
+- **Golden corpus** — `eval/prompts.jsonl` contains 20 fixed prompts across landing pages, e-commerce, redesign/edit, dashboards, forms, content, checkout, multi-page, mobile, reduced motion, and adversarial asks.
+- **Eval harness** — `node scripts/eval-suite.mjs validate` checks corpus coverage; `commands` prints reproducible `omp -p` runs; `score <output-root>` runs deterministic validators over generated outputs.
+- **Trace audit** — `node scripts/audit-trace.mjs <trace.jsonl> --strict` verifies prompt injection, skill discovery, automatic validation, explicit validator calls, and build calls.
+
 ---
 
 ## Files
@@ -146,7 +151,12 @@ omp-designer/
 ├── scripts/
 │   ├── fix-ai-slop.mjs          # Read-only anti-slop validator; --fix mutates
 │   ├── analyze-layout.mjs       # Layout + palette + motion validator
-│   └── check-release.mjs        # Version + secret hygiene release gate
+│   ├── check-release.mjs        # Version + secret hygiene release gate
+│   ├── eval-suite.mjs           # Golden prompt corpus validator/scorer
+│   └── audit-trace.mjs          # JSONL run trace auditor
+├── eval/
+│   ├── prompts.jsonl            # 20-prompt regression corpus
+│   └── fixtures/                # Existing-app fixtures for redesign/edit tests
 ├── test-output/                 # Test projects
 ├── docs/problems.md             # Known issues + fixes
 └── loop.md                      # Improvement loop
