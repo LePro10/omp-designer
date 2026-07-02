@@ -26,12 +26,12 @@ Each section should feel like the NEXT chapter, not the same chapter repeated.
 ### Simple scroll reveal (CSS or Motion)
 **When:** Most content sections. Elements fade in as they enter the viewport.
 **How:** `whileInView={{ opacity: 1, y: 0 }}` with `viewport={{ once: true, margin: "-80px" }}`
-**Duration:** 300-500ms, ease-out
+**Duration:** See animate skill for canonical timing table
 **Use for:** Feature cards, testimonials, stats, text blocks
 
 ### Staggered children (Motion variants)
 **When:** Grids of similar items (feature cards, pricing tiers, testimonials).
-**How:** Parent container staggers children by 50-100ms.
+**How:** Parent container staggers children by 60-90ms between children, max 120ms.
 **Use for:** Feature grids, pricing tables, testimonial cards
 
 ### Pinned scroll (GSAP ScrollTrigger)

@@ -388,6 +388,8 @@ Classify the result as slop when:
 
 This reduces false positives against legitimate styles.
 
+**Note:** The weighted 0–100 score (Section 12.2) is the canonical output metric for slop risk. The dimension-count heuristic above is a quick-check shortcut; for formal review, always calculate the weighted score.
+
 ## 8. Severity model
 
 ### Blocking

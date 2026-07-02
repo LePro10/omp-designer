@@ -29,7 +29,7 @@ function walk(dir) {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
-      if (["node_modules", "dist", ".git", "test-output", "pi-backup (old)", ".next", "coverage"].includes(entry)) continue;
+      if (["node_modules", "dist", ".git", "test-output", "pi-backup (old)", ".next", "coverage", "__tests__"].includes(entry)) continue;
       files.push(...walk(full));
     } else {
       files.push(full);
@@ -43,6 +43,12 @@ const secretPatterns = [
   { label: "OpenAI key", regex: /sk-[A-Za-z0-9_-]{20,}/g },
   { label: "GitHub token", regex: /gh[pousr]_[A-Za-z0-9_]{20,}/g },
   { label: "Anthropic key", regex: /sk-ant-[A-Za-z0-9_-]{20,}/g },
+  { label: "AWS access key", regex: /AKIA[0-9A-Z]{16}/g },
+  { label: "Private key block", regex: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----/g },
+  { label: "JWT", regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
+  { label: "Bearer token", regex: /Bearer\s+[A-Za-z0-9_.\-+/=]{20,}/g },
+  { label: "Database URI with credentials", regex: /(?:postgres|mysql|mongodb|redis):\/\/[^:]+:[^@]+@/g },
+  { label: "Long hex API key in env field", regex: /["'](?:API_KEY|TOKEN|SECRET|PASSWORD|api_key|token|secret|password)["']\s*[:=]\s*["'][0-9a-fA-F]{32,}["']/g },
 ];
 
 const textExtensions = new Set([".md", ".ts", ".tsx", ".js", ".mjs", ".json", ".yml", ".yaml", ".txt", ".csv"]);

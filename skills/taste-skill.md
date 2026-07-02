@@ -1,5 +1,5 @@
 ---
-name: design-taste-frontend
+name: taste-skill
 description: Anti-slop frontend skill for landing pages, portfolios, and redesigns. The agent reads the brief, infers the right design direction, and ships interfaces that do not look templated. Real design systems when applicable, audit-first on redesigns, strict pre-flight check.
 ---
 
@@ -322,6 +322,8 @@ Landing pages and portfolios are **visual products**. Text-only pages with fake-
 Animation is structure, not decoration. Pick one motion system per project and reuse it.
 
 ### 5.A Default timing
+
+See animate skill for canonical timing table. The values below align with those ranges.
 
 - Entrances: 240-320ms, ease-out-quint or `[0.22, 1, 0.36, 1]`.
 - Exits: 160-220ms, faster than entrances.

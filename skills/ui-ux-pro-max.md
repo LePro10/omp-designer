@@ -13,7 +13,7 @@ UI styles, UX guidelines, and chart types.
 ## Key Data
 
 ### Colors: `src/ui-ux-pro-max/data/colors.csv`
-- 162 product-type palette rows with explicit tokens:
+- 161 product-type palette rows with explicit tokens:
   Primary, On Primary, Secondary, On Secondary, Accent, On Accent,
   Background, Foreground, Card, Card Foreground, Muted, Muted Foreground,
   Border, Destructive, On Destructive, Ring.

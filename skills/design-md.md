@@ -94,7 +94,7 @@ Container: [e.g., max-w-[1400px] mx-auto px-6]
 - Level 3: [high — tooltips, toasts]
 [Shadow values with tinted shadows matching background hue]
 
-## Motion
+## Motion (see animate skill for canonical timing table)
 - Entrance: [duration 240-320ms] [easing] [property: opacity/transform] [distance]
 - Exit: [duration 160-220ms] [easing] [property]
 - Hover: [duration 140-200ms] [easing] [property]

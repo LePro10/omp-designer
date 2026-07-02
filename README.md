@@ -1,4 +1,4 @@
-# omp-designer — Autonomous AI Design System (v4.0)
+# omp-designer — Autonomous AI Design System (v4.1)
 
 A `/designer` extension for oh-my-pi that turns your AI coding agent into a UI/UX design specialist.
 
@@ -182,6 +182,7 @@ omp install npm:omp-designer
 omp
 /designer                        # DESIGNER MODE ON
 /designer-doctor                 # Optional: verify install, skills, MCPs, trace path
+/designer-reset                  # Reset skill gate after ordering violation
 "Build me a SaaS landing page"   # Agent asks questions first
 # Answer the questions
 # Agent shows plan with MCP research log
@@ -191,6 +192,18 @@ omp
 # Agent takes section screenshots
 # Agent reports substitution test + rationale test
 ```
+
+### Platform support
+
+| Feature | OMP (oh-my-pi) | Pi (pi.dev) |
+|---------|---------------|-------------|
+| Pre-execution tool blocking | Yes | No (prompt-only) |
+| Skill read tracking | Yes | No |
+| Session-stop validation | Yes | No |
+| Trace logging | Yes | No |
+| Doctor command | Yes | No |
+
+**For guaranteed skill-reading enforcement, use OMP.** Pi relies on model compliance with prompt instructions.
 
 ---
 

@@ -4,34 +4,45 @@
     "21st-dev-magic": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@21st-dev/magic@latest"
-      ],
+      "args": ["-y", "@21st-dev/magic@latest"],
       "env": {
-        "API_KEY": "db28ed54db43b5bab1db3dfdda099b28e4242eaad4bb7d17c99a30c0c25673b3"
-      }
+        "API_KEY": "<YOUR_21ST_DEV_API_KEY>"
+      },
+      "enabled": false
+    },
+    "designmd": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "designmd-mcp@latest"],
+      "env": {
+        "DESIGNMD_API_KEY": "<YOUR_DESIGNMD_API_KEY>"
+      },
+      "enabled": false
+    },
+    "ui-layouts": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@ui-layouts/mcp@latest"],
+      "enabled": false
     },
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
       "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--isolated",
-        "--headless",
-        "--no-usage-statistics",
-        "--no-performance-crux",
-        "--executable-path",
-        "/home/leandro/.cache/puppeteer/chrome/linux-149.0.7827.22/chrome-linux64/chrome",
+        "-y", "chrome-devtools-mcp@latest",
+        "--isolated", "--headless",
+        "--no-usage-statistics", "--no-performance-crux",
         "--chrome-arg=--no-sandbox",
         "--chrome-arg=--disable-gpu",
-        "--chrome-arg=--disable-dev-shm-usage"
+        "--chrome-arg=--disable-dev-shm-usage",
+        "--chrome-arg=--disable-logging",
+        "--chrome-arg=--log-level=3"
       ],
       "env": {
         "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1",
         "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"
-      }
+      },
+      "enabled": false
     }
   }
 }

@@ -1,5 +1,27 @@
 # Known Problems & TODOs
 
+## LATEST CHANGES (v4.1 — Skill Gate Enforcement + Security Hardening)
+
+### Technical Skill-Read Enforcement (closes the skip-skills bug)
+- [x] **Shared skill manifest** — `shared/skill-gate.mjs` is the single source of truth for required skills, used by both Pi and OMP extensions. No separate skill lists.
+- [x] **State machine** — `idle → loading_skills → skills_ready → discovery → brief_ready → plan_ready → approved → building → validating → done`. Gate only opens at `skills_ready` when all required skills are verified read.
+- [x] **Skill-read tracking** — Each skill read records: name, URI, timestamps, content hash (SHA-256), bytes read, status (pending/partial/complete/failed), and line-range coverage.
+- [x] **Line-coverage verification** — Large skills read in multiple passes are tracked by line range. A skill is `complete` only when all lines are covered. Reading only the YAML header counts as `partial`.
+- [x] **Tool gating** — `write`, `edit`, `ast_edit`, `bash`, `generate_image`, `browser`, `search_tool_bm25`, `resolve`, `task`, `ask` are blocked until `skills_ready`. Blocked calls return `DESIGNER_SKILL_GATE_BLOCKED` with missing skill names.
+- [x] **designer-master first** — The gate tracks read order. `wasMasterReadFirst()` verifies the orchestrator was read before any other skill.
+- [x] **Session artifact** — Machine-readable JSON report per session: sessionId, projectRoot, phase, manifestHash, skills[], missingSkills, ready, masterReadFirst, violations. Persisted to `~/.omp/agent/designer-gates/<cwd-hash>.json`.
+- [x] **Stale-read detection** — `validateReads()` re-checks skill file hashes. If content changed after reading, the skill is demoted to `partial` and the gate re-locks.
+- [x] **Session-stop gate validation** — If the gate is not ready at session stop, the agent is forced to continue and read missing skills.
+- [x] **Reduced prompt injection** — PROMPT_INJECT now includes `SkillGate.getGatePrompt()` explaining the technically enforced flow. No reliance on prompt compliance alone.
+- [x] **29 skill gate tests** — 18 spec cases + 11 additional tests (large file multi-pass, session artifact format, summary format, gate prompt content, manifest hash mismatch, integration scenarios, selector edge cases, coverage edge cases)
+- [x] **TypeScript compiles clean** — 0 errors with `--strict` type checking
+
+### Root Cause of Original Bug
+The previous system relied entirely on prompt instructions ("Read all skills", "MANDATORY") to enforce skill reading. A model could skip all skills and go straight to building. The old phase tracking (5 phases: `idle → planning → building → reviewing → validated`) was observational — it recorded what happened but couldn't prevent it. No tool-level gate existed. This has been replaced by the 10-phase state machine in `shared/skill-gate.mjs` with technical enforcement.
+
+### Architecture Decision
+Created `shared/skill-gate.mjs` as a shared core module imported by both `extension/index.ts` (OMP) and `extensions/designer.ts` (Pi). This ensures Pi and OMP use the same manifest, state machine, and gate logic. The OMP extension has full enforcement (tool_call/tool_result interception, skill-read tracking, session_stop validation). The Pi extension uses the shared manifest and gate prompt (Pi's API has fewer hooks).
+
 ## LATEST CHANGES (v4.0 — Iteration 9)
 
 ### Validator Hardening (adversarial testing)
@@ -10,9 +32,9 @@
 - [x] **Adversarial false-negative tests** — 5 new tests catch gaps the validator missed
 - [x] **Total validator tests: 11** (was 7)
 
-### Mechanical Phase Tracking
-- [x] **Phase state file** — `~/.omp/agent/designer-phases/<cwd-hash>.json` tracks `idle → planning → building → reviewing → validated`
-- [x] **Tool-call-driven transitions** — writing DESIGN.md/PRODUCT.md → planning; writing src/* → building; running validators → reviewing/validated
+### Phase Tracking (superseded by 10-phase state machine)
+- [x] **10-phase state machine** — `shared/skill-gate.mjs` defines: `idle → loading_skills → skills_ready → discovery → brief_ready → plan_ready → approved → building → validating → done` (+ `error_order_violation`)
+- [x] **Tool-call-driven transitions** — skill reads advance through `loading_skills`; all 12 complete triggers `skills_ready`; DESIGN.md/PRODUCT.md writes advance to `brief_ready`/`plan_ready`; validators advance to `validating`/`done`
 - [x] **Phase-aware session_stop** — validation failures now report the current phase and whether validators were run by the agent
 - [x] **Phase reset on agent_start** — fresh sessions start at `idle`
 - [x] **Doctor shows phase** — `/designer-doctor` reports current phase, files written, validators run
@@ -27,7 +49,7 @@
 
 ### P1: Agent still skips manual post-build scripts sometimes
 The PROMPT_INJECT says "MANDATORY" but the agent selectively ignores when context is long.
-**Status:** Structurally mitigated in omp: `session_stop` now runs the two deterministic validators automatically. Phase tracking (`idle → planning → building → reviewing → validated`) provides mechanical evidence of whether the agent ran validators. Build/browser checks still depend on agent/tool execution.
+**Status:** Structurally mitigated in omp: `session_stop` now runs the two deterministic validators automatically. The 10-phase state machine (`idle → loading_skills → skills_ready → discovery → brief_ready → plan_ready → approved → building → validating → done`) provides mechanical evidence of whether the agent ran validators. Build/browser checks still depend on agent/tool execution.
 
 ### P2: MCP research still skipped when MCPs are unavailable
 Need stronger fallback behavior — agent should use web_search or browser.

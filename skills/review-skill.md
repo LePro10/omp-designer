@@ -1,5 +1,5 @@
 ---
-name: design-review
+name: review-skill
 description: "Post-implementation quality check. AI-SLOP.md is the canonical anti-slop reference. Max 3 fix cycles."
 ---
 
@@ -132,13 +132,11 @@ Evaluate each dimension from 0-4:
 
 **Shipping readiness:** Pass/fail based on blocking defects, functional tasks, accessibility target, and evidence. A visually distinctive page can still fail shipping readiness.
 
-**Slop risk:** Count dimensions scoring 3+. Interpretation:
+**Slop risk:** Calculate the weighted 0–100 score from AI-SLOP.md Section 12.2 (canonical output metric). As a quick check, count dimensions scoring 3+:
 - 0 dimensions at 3+: low slop risk
 - 1-2 dimensions at 3+: minor concerns
 - 3-4 dimensions at 3+: noticeable genericity
 - 5+ dimensions at 3+: major slop characteristics
-
-Do not collapse shipping readiness and slop risk into one number.
 
 ---
 
