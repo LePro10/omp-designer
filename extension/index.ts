@@ -828,18 +828,27 @@ export default function (pi: ExtensionAPI): void {
         orderViolated: report.orderViolated,
       });
 
-      // Ordering violation is permanent — requires explicit /designer-reset
+      // Ordering violation: auto-reset the gate and instruct agent to start over
       if (report.orderViolated) {
+        gate.resetRun();
+        saveGateReport(cwd);
+        writeTrace(cwd, "gate_auto_reset_on_violation", { newRunId: gate.runId });
+        const requiredSkills = REQUIRED_DESIGNER_SKILLS.filter((s) => s.required);
+        const skillList = requiredSkills
+          .map((s) => `  ${s.order}. ${s.name} (${s.uri})`)
+          .join("\n");
         return {
           continue: true,
           additionalContext: [
-            "[DESIGNER SKILL GATE: ORDER VIOLATION]",
-            `Phase: ${report.phase}`,
-            `Violation: ${report.orderViolationSkill} was started before designer-master completed.`,
+            "[DESIGNER SKILL GATE: RESET — READ SKILLS NOW]",
+            `The skill gate has been reset due to an ordering violation.`,
+            `${report.orderViolationSkill} was started before designer-master was fully read.`,
             "",
-            "designer-master MUST be read completely before any other required skill.",
-            "This violation is permanent for this run.",
-            "Run /designer-reset to start a fresh skill gate run.",
+            "REQUIRED: Read designer-master COMPLETELY first, then read every remaining skill.",
+            "Do NOT start reading any other skill until designer-master is fully complete.",
+            "",
+            "Read skills in this order:",
+            skillList,
             "[/DESIGNER SKILL GATE]",
           ].join("\n"),
         };
