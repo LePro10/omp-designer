@@ -2,9 +2,20 @@
  * Designer Mode v2 Extension for Pi (pi.dev)
  *
  * Adds /designer toggle command.
- * When ON: injects design workflow system prompt + CSV data path.
+ * When ON: injects design workflow system prompt + skill gate instructions.
  * Skills are auto-discovered by Pi from the skills/ directory.
  * MCPs: 21st-dev, chrome-devtools, ui-layouts, designmd.
+ *
+ * Uses shared/skill-gate.mjs as the single source of truth for the skill
+ * manifest and gate prompt — same module as the OMP extension.
+ *
+ * CAPABILITY LIMITATION: Pi's Extension API only exposes before_agent_start
+ * and registerCommand. There are no tool_call, tool_result, or session_stop
+ * hooks. Therefore, Pi CANNOT enforce pre-execution blocking of tools.
+ * Enforcement on Pi relies on prompt instructions only — this is NOT
+ * technical enforcement. For true pre-execution blocking, use OMP.
+ *
+ * See HOST_CAPABILITIES in shared/skill-gate.mjs for the capability matrix.
  */
 
 import { homedir } from "node:os";
@@ -12,12 +23,31 @@ import { join, dirname } from "node:path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+// ── Shared core (same module as OMP) ───────────────────────────────────
+
+import {
+  SkillGate,
+  REQUIRED_DESIGNER_SKILLS,
+  PHASES,
+  HOST_CAPABILITIES,
+  computeManifestHash,
+} from "../shared/skill-gate.mjs";
+
 // ── Paths ──────────────────────────────────────────────────────────────
 
 const HOME = homedir();
 const AGENT_DIR = join(HOME, ".pi", "agent");
 const STATE_FILE = join(AGENT_DIR, "designer-state.json");
 const MCP_CONFIG = join(AGENT_DIR, "mcp.json");
+const GATE_DIR = join(AGENT_DIR, "designer-gates");
+
+// Resolved at module load time from the extension's location.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// Package root is the parent of extensions/
+const PACKAGE_ROOT = join(__dirname, "..");
+const CSV_DATA_ROOT = join(PACKAGE_ROOT, "data", "ui-ux-pro-max");
+const SKILLS_SOURCE_DIR = join(PACKAGE_ROOT, "skills");
 
 interface PiCommandContext {
   ui: { notify: (msg: string, level: string) => void };
@@ -33,6 +63,13 @@ interface PiExtensionAPI {
     opts: { description: string; handler: (args: unknown, ctx: PiCommandContext) => void | Promise<void> }
   ): void;
   on(event: "before_agent_start", handler: (event: PiAgentStartEvent) => { systemPrompt: string } | undefined): void;
+}
+
+// ── Skill path resolution (Pi: skills/<name>.md in the package) ─────────
+
+function resolveSkillPath(name: string): string | null {
+  const path = join(SKILLS_SOURCE_DIR, `${name}.md`);
+  return existsSync(path) ? path : null;
 }
 
 // ── MCP server names managed by designer mode ──────────────────────────
@@ -99,7 +136,6 @@ function setDesignerMcpEnabled(enabled: boolean): void {
   } catch { /* mcp.json broken/missing — no crash */ }
 }
 
-
 /** Check mcp.json for placeholder API keys. Returns names of servers with missing keys. */
 function getMissingMcpKeys(): string[] {
   const missing: string[] = [];
@@ -124,25 +160,37 @@ function getMissingMcpKeys(): string[] {
   } catch { /* silently ignore parse errors */ }
   return missing;
 }
+
 function syncMcpConfigOnStartup(): void {
   setDesignerMcpEnabled(isOn());
 }
 
+// ── Skill gate report persistence ──────────────────────────────────────
+
+function gateReportPath(): string {
+  return join(GATE_DIR, "pi-designer-gate.json");
+}
+
+function saveGateReport(gate: SkillGate): void {
+  try {
+    mkdirSync(GATE_DIR, { recursive: true });
+    writeFileSync(gateReportPath(), JSON.stringify(gate.generateReport(), null, 2) + "\n");
+  } catch { /* persistence must never crash */ }
+}
+
 // ── System prompt injection ────────────────────────────────────────────
 
-/** Resolved at module load time from the extension's location. */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// Package root is the parent of extensions/
-const PACKAGE_ROOT = join(__dirname, "..");
-const CSV_DATA_ROOT = join(PACKAGE_ROOT, "data", "ui-ux-pro-max");
-
 function buildPrompt(): string {
+  const requiredSkills = REQUIRED_DESIGNER_SKILLS.filter((s) => s.required);
+  const skillList = requiredSkills
+    .map((s) => `  ${s.order}. ${s.name} (${s.uri})`)
+    .join("\n");
+
   return `
 
 [DESIGNER MODE v2: ACTIVE]
 
-You are an autonomous UI/UX designer. You produce production-ready websites.
+${SkillGate.getGatePrompt()}
 
 ## STEP 1: Choose interaction mode
 
@@ -156,41 +204,28 @@ Pick exactly one mode before acting:
 | Batch | "do not wait", "no approval", "build it now", "just make it", "batch", or pi/omp headless task | Ask no questions; document assumptions in PRODUCT.md | No approval wait; build after plan |
 
 Never combine modes. Never ask questions in Batch. Never wait for "accept" in Batch.
-## STEP 2: Write PRODUCT.md + EVIDENCE.md (before any design work)
+
+## STEP 2: Write PRODUCT.md + EVIDENCE.md (after skills are loaded)
 
 Write PRODUCT.md with: what it is, audience, brand voice, provided facts (prefix "Source: user"), missing facts as [NEEDS INPUT].
-
-Write EVIDENCE.md tracking every factual claim:
-| Claim | Source | Confidence | Allowed wording |
-If the user didn't provide it: confidence 0, "MUST NOT USE".
+Write EVIDENCE.md tracking every factual claim. If the user didn't provide it: confidence 0, "MUST NOT USE".
 
 ## STEP 3: Plan (MANDATORY, do not skip)
 
-Write a plan with these sections:
-
-1. Brand & Voice - name, one-liner, voice, anti-patterns
-2. Visual System - palette row + exact hex values, typography row + exact fonts, dials
-3. Stack - framework, motion library, icons/images
-4. Pages/Routes - only what the user asked for
-5. Sections - for each: purpose, layout family, copy direction, animation
-6. MCP Research Log - every MCP query + result
-7. Risks & Mitigations
-
-Present the plan with the selected mode at the top.
-Approval handling follows STEP 1: Guided/Adaptive wait after plan; Autonomous continues after the single emotion answer and plan; Batch continues immediately without approval wait.
+Write a plan with: Brand & Voice, Visual System (palette + hex, typography + fonts, dials), Stack, Pages/Routes, Sections, MCP Research Log, Risks & Mitigations.
+Approval handling follows STEP 1. Guided/Adaptive: end with "Type 'accept' to build, or tell me what to change." Autonomous: continue after plan. Batch: continue immediately.
 
 ## STEP 4: MCP research (during planning)
 
 Run search_tool_bm25("21st-dev ui-layouts chrome-devtools designmd").
-Attempt ALL. If unavailable, try web_search or browser as fallback. Document every attempt.
-Silent skipping is not acceptable.
+Attempt ALL. If unavailable, try web_search or browser as fallback. Document every attempt. Silent skipping is not acceptable.
 
 ## STEP 5: Design tokens
 
-Palette: DATA_ROOT/colors.csv is the default source. If the user provides brand colors, preserve them. Any non-CSV color must be Source: user in PRODUCT.md or a documented derivation in DESIGN.md.
-Typography: DATA_ROOT/typography.csv - pick by row number. Copy exact font names.
-Avoid: Inter, Roboto, Geist, Plus Jakarta Sans, Space Grotesk.
-Write DESIGN.md before building any component.
+Palette: ${CSV_DATA_ROOT}/colors.csv is the default source. If the user provides brand colors, preserve them. Any non-CSV color must appear as Source: user in PRODUCT.md or as a documented derivation in DESIGN.md.
+Typography: ${CSV_DATA_ROOT}/typography.csv - pick by row number. Copy exact font names.
+Avoid: Inter, Roboto, Geist, Plus Jakarta Sans, Space Grotesk (overused).
+Write DESIGN.md with all tokens before building any component.
 
 ## STEP 6: Build
 
@@ -224,7 +259,7 @@ If ANY reports issues: fix and rerun. Take desktop, mobile 375px, tablet 1024px,
 **Honesty:** No invented prices, metrics, counts, testimonials. If missing: "Price on request" or [NEEDS INPUT].
 
 [/DESIGNER MODE]
-`.replaceAll("DATA_ROOT", CSV_DATA_ROOT);
+`;
 }
 
 // ── Extension entry point ──────────────────────────────────────────────
@@ -236,7 +271,7 @@ export default function designerExtension(pi: PiExtensionAPI): void {
   // ── /designer toggle command ─────────────────────────────────────────
   pi.registerCommand("designer", {
     description:
-      "Toggle designer mode — design workflow prompt + 4 MCP servers",
+      "Toggle designer mode — design workflow prompt + skill gate + 4 MCP servers",
     handler: async (_args: unknown, ctx) => {
       const wasOn = isOn();
       const nextState = !wasOn;
@@ -246,7 +281,6 @@ export default function designerExtension(pi: PiExtensionAPI): void {
       setDesignerMcpEnabled(nextState);
 
       if (nextState) {
-
         // Check for missing API keys on first activation
         if (!wasOn) {
           const missing = getMissingMcpKeys();
@@ -257,8 +291,16 @@ export default function designerExtension(pi: PiExtensionAPI): void {
             );
           }
         }
+        // Initialize skill gate for session
+        const gate = new SkillGate({
+          sessionId: `pi-${Date.now()}`,
+          projectRoot: process.cwd(),
+          resolveSkillPath,
+        });
+        saveGateReport(gate);
+
         ctx.ui.notify(
-          "DESIGNER MODE ON — workflow active, design MCPs enabled. Run /reload to activate MCPs.",
+          "DESIGNER MODE ON — skill gate prompt active (NOT pre-execution enforced on Pi). Read all required skills before proceeding. Run /reload to activate MCPs.",
           "info"
         );
       } else {
@@ -269,11 +311,24 @@ export default function designerExtension(pi: PiExtensionAPI): void {
       }
     },
   });
+
   // ── Inject system prompt ONLY when designer mode is ON ────────────────
   pi.on("before_agent_start", (event) => {
     if (!isOn()) return;
     const currentPrompt = event.systemPrompt ?? "";
     if (currentPrompt.includes("[DESIGNER MODE")) return;
-    return { systemPrompt: currentPrompt + buildPrompt() };
+
+    // Initialize skill gate for this session (Pi doesn't have agent_start event)
+    const gate = new SkillGate({
+      sessionId: `pi-${Date.now()}`,
+      projectRoot: process.cwd(),
+      resolveSkillPath,
+    });
+    saveGateReport(gate);
+
+    const piCapabilityNote = HOST_CAPABILITIES.pi.preExecutionBlocking
+      ? ""
+      : "\n\nNOTE: Pi does not support pre-execution tool blocking. Skill reading is enforced via prompt instructions only. For technical enforcement, use OMP.\n";
+    return { systemPrompt: currentPrompt + buildPrompt() + piCapabilityNote };
   });
 }

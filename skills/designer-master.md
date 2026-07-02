@@ -103,9 +103,9 @@ Every externally verifiable claim (price, metric, count, certification, testimon
 ### 2A - Design read
 
 From taste-skill Sections 0-1, set and write these dials:
-- DESIGN_VARIANCE: 1-5
-- MOTION_INTENSITY: 1-5
-- VISUAL_DENSITY: 1-5
+- DESIGN_VARIANCE: 1-10
+- MOTION_INTENSITY: 1-10
+- VISUAL_DENSITY: 1-10
 
 ### 2B - Palette and typography
 

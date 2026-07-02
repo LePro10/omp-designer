@@ -3,13 +3,34 @@
  *
  * Adds /designer toggle command.
  * When ON: design workflow prompt + managed design skills + MCP toggles.
+ *
+ * Skill Gate: technically enforces that all required skills are fully read
+ * before any write/edit/build/MCP/plan-approval action is allowed.
+ * Uses shared/skill-gate.mjs as the single source of truth for the skill
+ * manifest, state machine, and gate logic.
  */
 
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
+
+// ── Shared core (single source of truth for Pi + OMP) ──────────────────
+
+import {
+  SkillGate,
+  REQUIRED_DESIGNER_SKILLS,
+  PHASES,
+  PHASE_ORDER,
+  PAST_GATE_PHASES,
+  computeManifestHash,
+  hashContent,
+  getRequiredSkillNames,
+  isToolAllowedBeforeReady,
+} from "../shared/skill-gate.mjs";
+
+// ── Paths ──────────────────────────────────────────────────────────────
 
 const HOME = homedir();
 const STATE_FILE = join(HOME, ".omp", "agent", "designer-state.json");
@@ -19,29 +40,29 @@ const CSV_DATA_ROOT = join(SKILLS_ROOT, "ui-ux-pro-max-skill", "src", "ui-ux-pro
 const QUALITY_SCRIPT = join(EXTENSION_ROOT, "fix-ai-slop.mjs");
 const LAYOUT_SCRIPT = join(EXTENSION_ROOT, "analyze-layout.mjs");
 const TRACE_DIR = join(HOME, ".omp", "agent", "designer-traces");
-const PHASE_DIR = join(HOME, ".omp", "agent", "designer-phases");
+const GATE_DIR = join(HOME, ".omp", "agent", "designer-gates");
 
 const DESIGNER_MARKER_PATTERN = /\[DESIGNER MODE(?: v\d+)?: ACTIVE\]/;
 const GLOBAL_STATE_KEY = "*";
 
-const SKILL_PATHS = [
-  join(SKILLS_ROOT, "designer-master", "SKILL.md"),
-  join(SKILLS_ROOT, "ai-slop", "SKILL.md"),
-  join(SKILLS_ROOT, "taste-skill", "SKILL.md"),
-  join(SKILLS_ROOT, "animate", "SKILL.md"),
-  join(SKILLS_ROOT, "product-md", "SKILL.md"),
-  join(SKILLS_ROOT, "design-md", "SKILL.md"),
-  join(SKILLS_ROOT, "reference-study", "SKILL.md"),
-  join(SKILLS_ROOT, "visual-critique", "SKILL.md"),
-  join(SKILLS_ROOT, "copywriting", "SKILL.md"),
-  join(SKILLS_ROOT, "scroll-choreography", "SKILL.md"),
-  join(SKILLS_ROOT, "review-skill", "SKILL.md"),
-  join(SKILLS_ROOT, "ui-ux-pro-max-skill", "SKILL.md"),
-];
+// ── Skill path resolution ──────────────────────────────────────────────
+
+/**
+ * Maps a skill name from the manifest to its installed file path.
+ * OMP stores skills at ~/.omp/agent/managed-skills/<dir>/SKILL.md.
+ * Note: "ui-ux-pro-max" skill lives in the "ui-ux-pro-max-skill" directory.
+ */
+function resolveSkillPath(name: string): string | null {
+  const dirName = name === "ui-ux-pro-max" ? "ui-ux-pro-max-skill" : name;
+  const path = join(SKILLS_ROOT, dirName, "SKILL.md");
+  return existsSync(path) ? path : null;
+}
+
+// ── Prompt injection (reduced — gate is technically enforced) ───────────
 
 const PROMPT_INJECT = `[DESIGNER MODE: ACTIVE]
 
-You are an autonomous UI/UX designer. You produce production-ready websites.
+${SkillGate.getGatePrompt()}
 
 ## STEP 1: Choose interaction mode
 
@@ -55,44 +76,21 @@ Pick exactly one mode before acting:
 | Batch | "do not wait", "no approval", "build it now", "just make it", "batch", or omp -p style task | Ask no questions; document assumptions in PRODUCT.md | No approval wait; build after plan |
 
 Never combine modes. Never ask questions in Batch. Never wait for "accept" in Batch.
-## STEP 2: Write PRODUCT.md + EVIDENCE.md (before any design work)
+
+## STEP 2: Write PRODUCT.md + EVIDENCE.md (after skills are loaded)
 
 Write PRODUCT.md with: what it is, audience, brand voice, provided facts (prefix "Source: user"), missing facts as [NEEDS INPUT].
-
-Write EVIDENCE.md tracking every factual claim:
-| Claim | Source | Confidence | Allowed wording |
-If the user didn't provide it: confidence 0, "MUST NOT USE".
+Write EVIDENCE.md tracking every factual claim. If the user didn't provide it: confidence 0, "MUST NOT USE".
 
 ## STEP 3: Plan (MANDATORY, do not skip)
 
-Write a plan with these sections:
+Write a plan with: Brand & Voice, Visual System (palette + hex, typography + fonts, dials), Stack, Pages/Routes, Sections, MCP Research Log, Risks & Mitigations.
+Approval handling follows STEP 1. Guided/Adaptive: end with "Type 'accept' to build, or tell me what to change." Autonomous: continue after plan. Batch: continue immediately.
 
-1. **Brand & Voice** - name, one-liner, voice, anti-patterns
-2. **Visual System** - palette row + exact hex values, typography row + exact fonts, dials (DESIGN_VARIANCE 1-5, MOTION_INTENSITY 1-5, VISUAL_DENSITY 1-5)
-3. **Stack** - framework, motion library, icons/images
-4. **Pages/Routes** - only what the user asked for
-5. **Sections** - for each: purpose, layout family, copy direction, animation
-6. **MCP Research Log** - every MCP query + result (see below)
-7. **Risks & Mitigations**
-
-Present the plan with the selected mode at the top.
-Approval handling follows STEP 1:
-- Guided/Adaptive: end with "Type 'accept' to build, or tell me what to change." Wait before building.
-- Autonomous: after the single emotion answer, present plan and continue without a second approval wait unless the user asks for one.
-- Batch: present concise plan and continue immediately; do not block on approval.
-
-## STEP 4: MCP research (during planning, not after)
+## STEP 4: MCP research (during planning)
 
 Run search_tool_bm25("21st-dev ui-layouts chrome-devtools designmd").
-
-Attempt ALL of these. If a tool is unavailable, try web_search or browser as fallback. Document every attempt:
-- designmd: search for design system matching the vibe
-- ui-layouts: find component source for one key section
-- 21st-dev: component inspiration for hero
-- chrome-devtools/browser: screenshot 2-3 reference sites
-
-If ALL MCPs are unavailable, use web_search to find 2-3 reference sites and screenshot them with browser. Document what you learned.
-Silent skipping is not acceptable. Every attempt must appear in the plan.
+Attempt ALL. If unavailable, try web_search or browser as fallback. Document every attempt. Silent skipping is not acceptable.
 
 ## STEP 5: Design tokens
 
@@ -103,10 +101,7 @@ Write DESIGN.md with all tokens before building any component.
 
 ## STEP 6: Build
 
-Build all components following the plan. For each section:
-- Confirm it appears in the approved plan
-- Use only DESIGN.md colors and fonts
-- Use generate_image for hero visuals. If unavailable, build product-specific SVG or component preview. Never use Unsplash/Pexels/Pixabay/Picsum.
+Build all components following the plan. Use generate_image for hero visuals. If unavailable, build product-specific SVG or component preview. Never use Unsplash/Pexels/Pixabay/Picsum.
 
 ## STEP 7: Post-build self-check (MANDATORY, do not skip)
 
@@ -119,43 +114,29 @@ Before declaring done, run ALL of these from the project root:
 
 If ANY command reports issues: fix and rerun. Do not declare done with blocking issues.
 For em-dashes only, run node ${QUALITY_SCRIPT} --fix . and then rerun --check.
-
-Then take screenshots:
-- Desktop full page
-- Mobile 375px full page
-- Tablet 1024px full page (especially complex grids)
-- Section viewport screenshots: hero, first content section, features, conversion, footer
-
-Before screenshots: scroll top to bottom and back to trigger reveal animations.
+Take desktop, mobile 375px, tablet 1024px, and section viewport screenshots. Scroll top to bottom before screenshots.
 
 ## STEP 8: Anti-slop verification
 
-Apply these tests to the final output:
-- **Substitution test**: Could the product name and accent color be swapped while 80% stays plausible for another product? If yes, rewrite generic parts.
-- **Rationale test**: Does every section answer "what user need does this serve?" If only answer is "landing pages usually do this", rewrite.
-- **Anti-overcorrection**: Is the direction predictable from the category alone? (e.g., coffee -> warm brown, luxury -> gold) If yes, justify why this specific project needs this direction.
+- Substitution test: Could the product name and accent color be swapped while 80% stays plausible for another product? If yes, rewrite generic parts.
+- Rationale test: Does every section answer "what user need does this serve?" If only answer is "landing pages usually do this", rewrite.
+- Anti-overcorrection: Is the direction predictable from the category alone? If yes, justify why this specific project needs this direction.
 
-## CRITICAL RULES (these apply even if you skip the skills)
+## CRITICAL RULES
 
 **Copy:**
 Banned words: revolutionize, cutting-edge, seamless, empower, unlock, leverage, synergy, next-gen, game-changing, best-in-class, world-class, robust, scalable, holistic, comprehensive, innovative, transformative, elevate, curated, effortless, frictionless, pioneering, groundbreaking, next-level, future-proof, bulletproof, blazing-fast, lightning-fast, world-leading, industry-leading, turnkey, battle-tested, mission-critical, enterprise-grade, supercharge.
 Banned patterns: "Not just X, but Y", "Whether you're X or Y", "All-in-one", "Built for everyone".
 Read every visible string aloud. If it sounds like marketing email, rewrite. Short sentences. Active voice.
 
-**Motion:**
-Every scroll effect must explain the product. No decoration-only scroll. No horizontal scroll on mobile. One pinned scene max unless brief asks for narrative.
-
-**Images:**
-Never use stock photo CDNs. Prefer generate_image. Fallback: product-specific SVG or component preview.
-
-**Honesty:**
-No invented prices, metrics, counts, testimonials. If missing: "Price on request" or [NEEDS INPUT].
-
-**Scope after approval:**
-Allowed: animation timing, copy polish, spacing, responsive fixes.
-Requires re-approval: new pages, new features, new sections, SDK examples.
+**Motion:** Every scroll effect must explain the product. No decoration-only scroll. No horizontal scroll on mobile. One pinned scene max unless brief asks for narrative.
+**Images:** Never use stock photo CDNs. Prefer generate_image. Fallback: product-specific SVG or component preview.
+**Honesty:** No invented prices, metrics, counts, testimonials. If missing: "Price on request" or [NEEDS INPUT].
+**Scope after approval:** Allowed: animation timing, copy polish, spacing, responsive fixes. Requires re-approval: new pages, new features, new sections, SDK examples.
 
 [/DESIGNER MODE]`;
+
+// ── State management ───────────────────────────────────────────────────
 
 function readState(): Record<string, boolean> {
   try {
@@ -202,6 +183,8 @@ function toggle(cwd: string): boolean {
   return newState;
 }
 
+// ── MCP config management ──────────────────────────────────────────────
+
 const DESIGNER_MCP_NAMES: Record<string, true> = {
   "21st-dev-magic": true,
   "ui-layouts": true,
@@ -235,6 +218,8 @@ function setDesignerMcpEnabled(enabled: boolean): void {
   } catch { /* mcp.json missing or corrupt */ }
 }
 
+// ── Prompt normalization ───────────────────────────────────────────────
+
 function normalizePromptList(systemPrompt?: string | string[]): string[] {
   if (Array.isArray(systemPrompt)) return systemPrompt;
   return systemPrompt ? [systemPrompt] : [];
@@ -254,6 +239,8 @@ function withoutDesignerPrompts(prompts: string[]): string[] {
   }
   return cleaned;
 }
+
+// ── Utilities ──────────────────────────────────────────────────────────
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
@@ -287,6 +274,40 @@ function commandKind(command: unknown): string | undefined {
   return command.trim().split(/\s+/)[0];
 }
 
+// ── Trace redaction ──────────────────────────────────────────────────
+
+const SECRET_PATTERNS = [
+  /npm_[A-Za-z0-9]{20,}/g,
+  /sk-[A-Za-z0-9_-]{20,}/g,
+  /sk-ant-[A-Za-z0-9_-]{20,}/g,
+  /gh[pousr]_[A-Za-z0-9_]{20,}/g,
+  /AKIA[0-9A-Z]{16}/g,
+  /Bearer\s+[A-Za-z0-9_.\-+/=]{20,}/g,
+];
+
+function redactSecrets(value: unknown): unknown {
+  if (typeof value === "string") {
+    let result = value;
+    for (const pattern of SECRET_PATTERNS) {
+      pattern.lastIndex = 0;
+      result = result.replace(pattern, "[REDACTED]");
+    }
+    // Redact long hex strings that look like API keys (32+ hex chars in env-like contexts)
+    result = result.replace(/(?:API_KEY|TOKEN|SECRET|PASSWORD)\s*[:=]\s*["']?([0-9a-fA-F]{32,})["']?/gi,
+      (match) => match.replace(/[0-9a-fA-F]{32,}/, "[REDACTED]"));
+    return result;
+  }
+  if (Array.isArray(value)) return value.map(redactSecrets);
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      result[k] = redactSecrets(v);
+    }
+    return result;
+  }
+  return value;
+}
+
 function writeTrace(cwd: string | undefined, event: string, details: Record<string, unknown> = {}): void {
   try {
     if (!isOn(cwd) && event !== "designer_disabled") return;
@@ -295,96 +316,94 @@ function writeTrace(cwd: string | undefined, event: string, details: Record<stri
       timestamp: new Date().toISOString(),
       event,
       cwd: cwd ?? process.cwd(),
-      ...details,
+      ...redactSecrets(details) as Record<string, unknown>,
     };
     appendFileSync(tracePathForCwd(cwd), JSON.stringify(entry) + "\n");
   } catch { /* tracing must never break the agent loop */ }
 }
 
-type DesignerPhase = "idle" | "planning" | "building" | "reviewing" | "validated";
+// ── Skill gate instances (in-memory, per-cwd) ──────────────────────────
 
-interface PhaseState {
-  phase: DesignerPhase;
-  updatedAt: string;
-  filesWritten: string[];
-  validatorsRun: string[];
+const gateInstances = new Map<string, SkillGate>();
+
+function getGate(cwd?: string): SkillGate | undefined {
+  const activeCwd = cwd ?? process.cwd();
+  return gateInstances.get(activeCwd);
 }
 
-function phasePathForCwd(cwd?: string): string {
+function initGate(cwd: string): SkillGate {
+  const gate = new SkillGate({
+    sessionId: randomUUID(),
+    projectRoot: cwd,
+    resolveSkillPath,
+  });
+  gateInstances.set(cwd, gate);
+  return gate;
+}
+
+function gateReportPathForCwd(cwd?: string): string {
   const activeCwd = cwd ?? process.cwd();
   const basename = activeCwd.split("/").filter(Boolean).pop() ?? "root";
-  return join(PHASE_DIR, `${basename}-${shortHash(activeCwd)}.json`);
+  return join(GATE_DIR, `${basename}-${shortHash(activeCwd)}.json`);
 }
 
-function readPhase(cwd?: string): PhaseState {
+function saveGateReport(cwd?: string): void {
+  const gate = getGate(cwd);
+  if (!gate) return;
   try {
-    const path = phasePathForCwd(cwd);
+    mkdirSync(GATE_DIR, { recursive: true });
+    writeFileSync(gateReportPathForCwd(cwd), JSON.stringify(gate.generateReport(), null, 2) + "\n");
+  } catch { /* gate report persistence must never break the agent */ }
+}
+
+function readGateReport(cwd?: string): Record<string, unknown> | null {
+  try {
+    const path = gateReportPathForCwd(cwd);
     if (existsSync(path)) {
-      const raw = JSON.parse(readFileSync(path, "utf-8")) as unknown;
-      if (raw && typeof raw === "object") {
-        const r = raw as Record<string, unknown>;
-        if (typeof r.phase === "string") {
-          return {
-            phase: r.phase as DesignerPhase,
-            updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : "",
-            filesWritten: Array.isArray(r.filesWritten) ? r.filesWritten as string[] : [],
-            validatorsRun: Array.isArray(r.validatorsRun) ? r.validatorsRun as string[] : [],
-          };
-        }
-      }
+      return JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
     }
   } catch {}
-  return { phase: "idle", updatedAt: "", filesWritten: [], validatorsRun: [] };
+  return null;
 }
 
-function writePhase(cwd: string | undefined, update: Partial<PhaseState>): void {
-  try {
-    const current = readPhase(cwd);
-    const next: PhaseState = {
-      phase: update.phase ?? current.phase,
-      updatedAt: new Date().toISOString(),
-      filesWritten: update.filesWritten ?? current.filesWritten,
-      validatorsRun: update.validatorsRun ?? current.validatorsRun,
-    };
-    mkdirSync(PHASE_DIR, { recursive: true });
-    writeFileSync(phasePathForCwd(cwd), JSON.stringify(next));
-  } catch { /* phase tracking must never break the agent loop */ }
-}
+// ── Phase inference (post-gate, observational) ─────────────────────────
 
-function resetPhase(cwd: string | undefined): void {
-  try {
-    const path = phasePathForCwd(cwd);
-    if (existsSync(path)) rmSync(path);
-  } catch {}
-}
-
-/** Infer phase transition from a tool call event. Returns update or null. */
-function inferPhaseTransition(details: Record<string, unknown>, current: PhaseState): Partial<PhaseState> | null {
+/**
+ * Infer a phase transition from a tool call, based on the new state machine.
+ * Only called after skills_ready — the gate handles idle → loading_skills → skills_ready.
+ */
+function inferPhaseTransition(
+  details: Record<string, unknown>,
+  currentPhase: string,
+): string | null {
   const tool = typeof details.tool === "string" ? details.tool : "";
   const relPath = typeof details.relativePath === "string" ? details.relativePath : "";
   const kind = typeof details.commandKind === "string" ? details.commandKind : "";
 
-  // Validator run → reviewing
-  if (kind === "fix-ai-slop" || kind === "analyze-layout" || kind === "impeccable-detect") {
-    const validators = [...new Set([...current.validatorsRun, kind])];
-    const allRun = validators.includes("fix-ai-slop") && validators.includes("analyze-layout");
-    return { phase: allRun ? "validated" : "reviewing", validatorsRun: validators };
+  // Validator or build command → validating
+  if (kind === "fix-ai-slop" || kind === "analyze-layout" || kind === "impeccable-detect" ||
+      kind === "npm-run-build" || kind === "bun-run-build") {
+    return PHASES.VALIDATING;
   }
 
-  // Writing to src/ → building
+  // Writing src/ files → building
   if ((tool === "write" || tool === "edit") && relPath.startsWith("src/")) {
-    if (current.phase === "idle" || current.phase === "planning") {
-      return { phase: "building", filesWritten: [...new Set([...current.filesWritten, relPath])] };
-    }
-    return { filesWritten: [...new Set([...current.filesWritten, relPath])] };
+    return PHASES.BUILDING;
   }
 
-  // Writing DESIGN.md or PRODUCT.md → planning
-  if ((tool === "write" || tool === "edit") && (relPath === "DESIGN.md" || relPath === "PRODUCT.md" || relPath === "EVIDENCE.md")) {
-    if (current.phase === "idle") {
-      return { phase: "planning", filesWritten: [...new Set([...current.filesWritten, relPath])] };
-    }
-    return { filesWritten: [...new Set([...current.filesWritten, relPath])] };
+  // Writing DESIGN.md → plan_ready
+  if ((tool === "write" || tool === "edit") && relPath === "DESIGN.md") {
+    return PHASES.PLAN_READY;
+  }
+
+  // Writing PRODUCT.md/EVIDENCE.md → brief_ready
+  if ((tool === "write" || tool === "edit") && (relPath === "PRODUCT.md" || relPath === "EVIDENCE.md")) {
+    return PHASES.BRIEF_READY;
+  }
+
+  // resolve tool → approved
+  if (tool === "resolve") {
+    return PHASES.APPROVED;
   }
 
   return null;
@@ -399,13 +418,16 @@ function summarizeToolEvent(event: unknown, cwd?: string): Record<string, unknow
   if (typeof toolName === "string") summary.tool = toolName;
   const filePath = input.path ?? input.file ?? input.cwd;
   const safe = safePath(filePath, cwd);
-  if (safe) summary.path = safe;
+  if (safe) summary.relativePath = safe;
+  if (typeof filePath === "string") summary.filePath = filePath;
   const kind = commandKind(input.command);
   if (kind) summary.commandKind = kind;
   if (typeof record.isError === "boolean") summary.isError = record.isError;
   if (typeof result.isError === "boolean") summary.isError = result.isError;
   return summary;
 }
+
+// ── Doctor report ──────────────────────────────────────────────────────
 
 function fileHash(path: string): string {
   if (!existsSync(path)) return "missing";
@@ -445,28 +467,37 @@ function mcpStatus(): string {
 }
 
 function buildDoctorReport(cwd: string): string {
-  const skillsFound = SKILL_PATHS.filter((path) => existsSync(path)).length;
-  const tracePath = tracePathForCwd(cwd);
-  const phase = readPhase(cwd);
+  const requiredSkills = REQUIRED_DESIGNER_SKILLS.filter((s) => s.required);
+  const skillsFound = requiredSkills.filter((s) => {
+    const p = resolveSkillPath(s.name);
+    return p && existsSync(p);
+  }).length;
+  const gate = getGate(cwd);
+  const savedReport = readGateReport(cwd);
+  const gateSummary = gate?.getSummary() ?? "Skill gate: not initialized";
   const lines = [
     "Designer doctor",
     "",
     `Source/package version: ${packageVersion(cwd)}`,
     `Designer mode for cwd: ${isOn(cwd) ? "enabled" : "disabled"}`,
-    `Current phase: ${phase.phase} (updated: ${phase.updatedAt || "never"})`,
-    `Files written this session: ${phase.filesWritten.length}`,
-    `Validators run: ${phase.validatorsRun.length > 0 ? phase.validatorsRun.join(", ") : "none"}`,
+    `Skill gate: ${gate ? gate.phase : (savedReport?.phase as string ?? "idle")}`,
+    gateSummary,
+    `Manifest hash: ${computeManifestHash()}`,
+    `Required skills installed: ${skillsFound}/${requiredSkills.length}`,
+    "",
     `Installed extension hash: ${fileHash(join(EXTENSION_ROOT, "index.ts"))}`,
     `Installed fix-ai-slop: ${existsSync(QUALITY_SCRIPT) ? "present" : "missing"} (${fileHash(QUALITY_SCRIPT)})`,
     `Installed analyze-layout: ${existsSync(LAYOUT_SCRIPT) ? "present" : "missing"} (${fileHash(LAYOUT_SCRIPT)})`,
-    `Managed skills found: ${skillsFound}/${SKILL_PATHS.length}`,
     `MCP config: ${mcpStatus()}`,
-    `Trace file: ${tracePath}`,
+    `Trace file: ${tracePathForCwd(cwd)}`,
+    `Gate report: ${gateReportPathForCwd(cwd)}`,
     "",
-    "Release gate: run npm run check:release && npm run test:validators from the source repo.",
+    "Release gate: run npm run check:release && npm run test:skill-gate && npm run test:validators from the source repo.",
   ];
   return lines.join("\n");
 }
+
+// ── Session stop validation ────────────────────────────────────────────
 
 function looksLikeDesignerProject(cwd: string): boolean {
   const hasDesignArtifact =
@@ -518,6 +549,8 @@ function runSessionStopValidation(cwd: string): { ok: true; skipped?: string } |
   return { ok: false, output: truncateForContext(failures.join("\n\n")) };
 }
 
+// ── Extension API interfaces ───────────────────────────────────────────
+
 interface CommandContext {
   ui?: { notify?: (msg: string, level: string) => void };
   editor?: { setText?: (text: string) => void };
@@ -539,28 +572,41 @@ interface ExtensionAPI {
   on(event: string, handler: (event?: unknown, ctx?: { cwd?: string }) => unknown): void;
 }
 
+// ── Extension entry point ──────────────────────────────────────────────
+
 export default function (pi: ExtensionAPI): void {
   try {
     if (isOn(process.cwd())) setDesignerMcpEnabled(true);
   } catch {}
 
+  // ── /designer toggle ─────────────────────────────────────────────────
+
   pi.registerCommand("designer", {
-    description: "Toggle designer mode -- autonomous UI/UX design workflow",
+    description: "Toggle designer mode -- autonomous UI/UX design workflow with skill gate enforcement",
     aliases: ["design"],
     handler: (_args: unknown, ctx: CommandContext) => {
       const cwd = process.cwd();
       const nowOn = toggle(cwd);
       writeTrace(cwd, nowOn ? "designer_enabled" : "designer_disabled");
-      ctx?.ui?.notify?.(
-        nowOn ? "DESIGNER MODE ON -- skills loaded, MCPs enabled. Run /reload to activate MCPs." : "DESIGNER MODE OFF",
-        "info"
-      );
+      if (nowOn) {
+        const gate = initGate(cwd);
+        writeTrace(cwd, "skill_gate_initialized", { sessionId: gate.sessionId, phase: gate.phase });
+        ctx?.ui?.notify?.(
+          "DESIGNER MODE ON -- skill gate active. Read all required skills before proceeding. Run /reload to activate MCPs.",
+          "info"
+        );
+      } else {
+        gateInstances.delete(cwd);
+        ctx?.ui?.notify?.("DESIGNER MODE OFF", "info");
+      }
       ctx?.editor?.setText?.("");
     },
   });
 
+  // ── /designer-doctor ─────────────────────────────────────────────────
+
   pi.registerCommand("designer-doctor", {
-    description: "Show designer source/install/trace health",
+    description: "Show designer source/install/skill-gate/trace health",
     aliases: ["design-doctor"],
     handler: (_args: unknown, ctx: CommandContext) => {
       const cwd = process.cwd();
@@ -571,69 +617,285 @@ export default function (pi: ExtensionAPI): void {
     },
   });
 
+  // ── /designer-reset ────────────────────────────────────────────────
+
+  pi.registerCommand("designer-reset", {
+    description: "Reset the skill gate for a fresh run (clears ordering violations)",
+    aliases: ["design-reset"],
+    handler: (_args: unknown, ctx: CommandContext) => {
+      const cwd = process.cwd();
+      const gate = getGate(cwd);
+      if (gate) {
+        gate.resetRun();
+        saveGateReport(cwd);
+        writeTrace(cwd, "gate_reset", { newRunId: gate.runId });
+        ctx?.ui?.notify?.(
+          "Designer gate reset — fresh run started. Read designer-master first.",
+          "info"
+        );
+      } else {
+        ctx?.ui?.notify?.("No active designer gate to reset.", "warn");
+      }
+      ctx?.editor?.setText?.("");
+    },
+  });
+
+  // ── Skill discovery ──────────────────────────────────────────────────
+
   pi.on("resources_discover", (_event?: unknown, ctx?: { cwd?: string }) => {
     if (!isOn(ctx?.cwd)) return;
-    const skillPaths = SKILL_PATHS.filter((path) => existsSync(path));
-    writeTrace(ctx?.cwd, "skills_discovered", { count: skillPaths.length, expected: SKILL_PATHS.length });
+    const requiredSkills = REQUIRED_DESIGNER_SKILLS.filter((s) => s.required);
+    const skillPaths = requiredSkills
+      .map((s) => resolveSkillPath(s.name))
+      .filter((p): p is string => p !== null);
+    writeTrace(ctx?.cwd, "skills_discovered", {
+      count: skillPaths.length,
+      expected: requiredSkills.length,
+      manifestHash: computeManifestHash(),
+    });
     return { skillPaths };
   });
+
+  // ── Prompt injection ─────────────────────────────────────────────────
 
   pi.on("before_agent_start", (event?: unknown, ctx?: { cwd?: string }) => {
     if (!isOn(ctx?.cwd)) return;
     const agentEvent = asRecord(event);
     const prompts = withoutDesignerPrompts(normalizePromptList(agentEvent.systemPrompt as string | string[] | undefined));
-    writeTrace(ctx?.cwd, "prompt_injected", { skillsExpected: SKILL_PATHS.length });
+    const requiredCount = REQUIRED_DESIGNER_SKILLS.filter((s) => s.required).length;
+    writeTrace(ctx?.cwd, "prompt_injected", { skillsExpected: requiredCount, gateActive: true });
     return { systemPrompt: [...prompts, PROMPT_INJECT] };
   });
 
+  // ── Agent start: initialize skill gate ───────────────────────────────
+
   pi.on("agent_start", (_event?: unknown, ctx?: { cwd?: string }) => {
-    if (isOn(ctx?.cwd)) writePhase(ctx?.cwd, { phase: "idle", filesWritten: [], validatorsRun: [] });
-    writeTrace(ctx?.cwd, "agent_start");
-  });
-
-  pi.on("agent_end", (_event?: unknown, ctx?: { cwd?: string }) => {
-    writeTrace(ctx?.cwd, "agent_end");
-  });
-
-  pi.on("tool_call", (event?: unknown, ctx?: { cwd?: string }) => {
-    const details = summarizeToolEvent(event, ctx?.cwd);
-    writeTrace(ctx?.cwd, "tool_call", details);
     if (isOn(ctx?.cwd)) {
-      const current = readPhase(ctx?.cwd);
-      const transition = inferPhaseTransition(details, current);
-      if (transition) writePhase(ctx?.cwd, transition);
+      const cwd = ctx?.cwd ?? process.cwd();
+      // Initialize gate if not already done (e.g., agent started without /designer toggle)
+      if (!getGate(cwd)) {
+        initGate(cwd);
+      }
+      writeTrace(cwd, "agent_start", { gatePhase: getGate(cwd)?.phase ?? "idle" });
+    } else {
+      writeTrace(ctx?.cwd, "agent_start");
     }
   });
 
-  pi.on("tool_result", (event?: unknown, ctx?: { cwd?: string }) => {
-    writeTrace(ctx?.cwd, "tool_result", summarizeToolEvent(event, ctx?.cwd));
+  pi.on("agent_end", (_event?: unknown, ctx?: { cwd?: string }) => {
+    saveGateReport(ctx?.cwd);
+    writeTrace(ctx?.cwd, "agent_end", { gatePhase: getGate(ctx?.cwd)?.phase ?? "idle" });
   });
+
+  // ── Tool call: PRE-EXECUTION blocking + skill-read begin ───────────
+  //
+  // OMP Extension API: tool_call handlers can return { block: true, reason }
+  // to prevent the tool from executing. This is verified from the OMP source:
+  //   shared-events.ts → ToolCallEventResult { block?: boolean; reason?: string }
+  //   extensions/types.ts → "Fired before a tool executes. Can block."
+  //
+  // Deny-by-default: ALL tools are checked against the allowlist.
+  // Only read-only/inspection tools are allowed before skills_ready.
+  // Everything else — write, edit, bash, MCP, browser, unknown tools — is blocked.
+
+  pi.on("tool_call", (event?: unknown, ctx?: { cwd?: string }) => {
+    const eventRecord = asRecord(event);
+    const toolCallId = typeof eventRecord.toolCallId === "string" ? eventRecord.toolCallId : "";
+    const toolName = typeof eventRecord.toolName === "string" ? eventRecord.toolName : "";
+    const input = asRecord(eventRecord.input);
+
+    const details = summarizeToolEvent(event, ctx?.cwd);
+    writeTrace(ctx?.cwd, "tool_call", { ...details, toolCallId });
+
+    if (!isOn(ctx?.cwd)) return;
+
+    const gate = getGate(ctx?.cwd);
+    if (!gate) return;
+
+    // ── Detect skill reads: register as pending (not complete yet) ──
+    const match = gate.matchSkillRead(input);
+    if (match) {
+      gate.beginRead(toolCallId, match.skill, match.selector);
+      const skillName = (match.skill as { name: string }).name;
+      writeTrace(ctx?.cwd, "skill_read_begin", {
+        skill: skillName,
+        selector: match.selector || "(none)",
+        toolCallId,
+        gatePhase: gate.phase as string,
+        orderViolated: gate.orderViolated,
+      });
+      // Skill reads are never blocked — allow the read to proceed
+      return;
+    }
+
+    // ── Gate check: deny-by-default for ALL tools ──
+    if (toolName) {
+      const check = gate.checkTool(toolName);
+      if (!check.allowed) {
+        writeTrace(ctx?.cwd, "skill_gate_blocked", {
+          tool: toolName,
+          toolCallId,
+          missing: check.missingSkills,
+          phase: gate.phase,
+          preExecution: true,
+        });
+        saveGateReport(ctx?.cwd);
+        // Return { block: true, reason } — OMP prevents the tool from executing
+        return { block: true, reason: check.message };
+      }
+    }
+  });
+
+  // ── Tool result: complete skill reads + post-gate phase tracking ────
+
+  pi.on("tool_result", (event?: unknown, ctx?: { cwd?: string }) => {
+    const eventRecord = asRecord(event);
+    const toolCallId = typeof eventRecord.toolCallId === "string" ? eventRecord.toolCallId : "";
+    const isError = eventRecord.isError === true;
+    const details = asRecord(eventRecord.details);
+
+    // Extract truncation info from ReadToolDetails if present
+    const truncation = details?.truncation ?? null;
+
+    const summary = summarizeToolEvent(event, ctx?.cwd);
+    writeTrace(ctx?.cwd, "tool_result", { ...summary, toolCallId, isError });
+
+    if (!isOn(ctx?.cwd)) return;
+
+    const gate = getGate(ctx?.cwd);
+    if (!gate) return;
+
+    // ── Complete pending skill reads ──
+    // Only register the read as (partially or fully) complete if the
+    // tool_result was successful and content wasn't truncated in a way
+    // that breaks coverage.
+    if (toolCallId && gate.pendingReads.has(toolCallId)) {
+      // Capture skill name BEFORE completeRead deletes the pending entry
+      const pendingEntry = gate.pendingReads.get(toolCallId);
+      const skillName = pendingEntry ? (pendingEntry.skill as { name: string }).name : "(unknown)";
+      const registered = gate.completeRead(toolCallId, isError, truncation);
+
+      if (!registered && isError) {
+        writeTrace(ctx?.cwd, "skill_read_failed", { skill: skillName, toolCallId });
+      } else {
+        const record = gate.readRecords.get(skillName);
+        writeTrace(ctx?.cwd, "skill_read_complete", {
+          skill: skillName,
+          toolCallId,
+          status: record?.status ?? "pending",
+          bytesRead: record?.bytesRead ?? 0,
+          gatePhase: gate.phase as string,
+        });
+      }
+
+      // Check if gate just opened
+      if ((gate.phase as string) === PHASES.SKILLS_READY) {
+        saveGateReport(ctx?.cwd);
+        writeTrace(ctx?.cwd, "designer_skills_ready", {
+          masterReadFirst: gate.wasMasterReadFirst(),
+          summary: gate.getSummary(),
+        });
+      }
+    }
+
+    // ── Post-gate phase inference (observational, for reporting) ──
+    if (gate.isReady()) {
+      const inferred = inferPhaseTransition(summary, gate.phase);
+      if (inferred) {
+        if (gate.transitionTo(inferred)) {
+          writeTrace(ctx?.cwd, "phase_transition", { from: gate.phase, to: inferred });
+          saveGateReport(ctx?.cwd);
+        }
+      }
+    }
+  });
+
+  // ── Session stop: validate gate + run post-build validators ──────────
 
   pi.on("session_stop", (_event?: unknown, ctx?: { cwd?: string }) => {
     if (!isOn(ctx?.cwd)) return;
     const cwd = ctx?.cwd ?? process.cwd();
-    const phase = readPhase(cwd);
-    writeTrace(cwd, "auto_validation_started", { phase: phase.phase, filesWritten: phase.filesWritten.length, validatorsRun: phase.validatorsRun });
+    const gate = getGate(cwd);
+
+    saveGateReport(cwd);
+
+    // ── Gate validation ──────────────────────────────────────────────
+    if (gate && !gate.isReady()) {
+      const report = gate.generateReport();
+      writeTrace(cwd, "session_stop_gate_not_ready", {
+        missing: report.missingSkills,
+        phase: report.phase,
+        orderViolated: report.orderViolated,
+      });
+
+      // Ordering violation is permanent — requires explicit /designer-reset
+      if (report.orderViolated) {
+        return {
+          continue: true,
+          additionalContext: [
+            "[DESIGNER SKILL GATE: ORDER VIOLATION]",
+            `Phase: ${report.phase}`,
+            `Violation: ${report.orderViolationSkill} was started before designer-master completed.`,
+            "",
+            "designer-master MUST be read completely before any other required skill.",
+            "This violation is permanent for this run.",
+            "Run /designer-reset to start a fresh skill gate run.",
+            "[/DESIGNER SKILL GATE]",
+          ].join("\n"),
+        };
+      }
+
+      return {
+        continue: true,
+        additionalContext: [
+          "[DESIGNER SKILL GATE: NOT READY]",
+          `Phase: ${report.phase}`,
+          `Missing skills: ${report.missingSkills.join(", ")}`,
+          "",
+          "You must read all required skills before the session can end.",
+          "Read the missing skills using their skill:// URIs.",
+          "The extension verifies completion — do not claim skills were read.",
+          "[/DESIGNER SKILL GATE]",
+        ].join("\n"),
+      };
+    }
+
+    // Validate skill content hasn't changed
+    if (gate) {
+      const changed = gate.validateReads();
+      if (changed.length > 0) {
+        writeTrace(cwd, "skill_content_changed", { changed });
+        return {
+          continue: true,
+          additionalContext: [
+            "[DESIGNER SKILL GATE: CONTENT CHANGED]",
+            `Skills with changed content: ${changed.join(", ")}`,
+            "Re-read these skills before continuing.",
+            "[/DESIGNER SKILL GATE]",
+          ].join("\n"),
+        };
+      }
+    }
+
+    // ── Post-build validation ────────────────────────────────────────
+    const phase = gate?.phase ?? "unknown";
+    writeTrace(cwd, "auto_validation_started", { phase });
     const validation = runSessionStopValidation(cwd);
     if (validation.ok) {
-      writePhase(cwd, { phase: "validated" });
-      writeTrace(cwd, "auto_validation_passed", { phase: "validated", ...(validation.skipped ? { skipped: validation.skipped } : {}) });
+      if (gate) gate.transitionTo(PHASES.DONE);
+      writeTrace(cwd, "auto_validation_passed", {
+        phase: gate?.phase ?? "done",
+        ...(validation.skipped ? { skipped: validation.skipped } : {}),
+      });
       return;
     }
 
-    const phaseNote = phase.phase === "idle"
-      ? "No DESIGN.md, PRODUCT.md, or src/ files were detected — validation may be running on a non-designer project."
- : phase.phase === "building"
-      ? "Validation ran while still in building phase — validators may not have been run by the agent."
-      : "";
-
-    writeTrace(cwd, "auto_validation_failed", { phase: phase.phase });
+    writeTrace(cwd, "auto_validation_failed", { phase });
     return {
       continue: true,
       additionalContext: [
         "[DESIGNER AUTO-VALIDATION FAILED]",
-        `Phase: ${phase.phase}`,
-        phaseNote,
+        `Phase: ${phase}`,
         "Before answering the user, fix these blocking issues and rerun validation from the project root.",
         "",
         validation.output,
@@ -642,7 +904,7 @@ export default function (pi: ExtensionAPI): void {
         `node ${QUALITY_SCRIPT} --check .`,
         `node ${LAYOUT_SCRIPT} .`,
         "[/DESIGNER AUTO-VALIDATION FAILED]",
-      ].filter(Boolean).join("\n"),
+      ].join("\n"),
     };
   });
 }

@@ -229,7 +229,7 @@ Keep notes. What you changed, why, score before/after. This helps you track what
 - Fixed 3 validator bugs: TypeScript `returns` false positive, Unicode `×` multiplier false negative, en-dash `–` detection gap
 - Expanded buzzword list from 40 to 63 entries (added synonyms: effortless, frictionless, pioneering, groundbreaking, etc.)
 - Added 5 adversarial tests (total: 30 tests, was 26)
-- Added mechanical phase tracking: `idle → planning → building → reviewing → validated` based on tool call patterns
+- Added mechanical phase tracking: 10-phase state machine (`idle → loading_skills → skills_ready → discovery → brief_ready → plan_ready → approved → building → validating → done`) via shared/skill-gate.mjs
 - Phase-aware session_stop validation reports current phase when validation fails
 - Doctor command shows phase, files written, validators run
 - Synced AGENTS.md, docs/problems.md
@@ -298,7 +298,7 @@ Keep notes. What you changed, why, score before/after. This helps you track what
 ## Testing notes
 
 - ⚠️ **Designer state must be `false` when the loop agent is working.** Only set it `true` for the `omp -p` test, then immediately back to `false`.
-- The test agent (`omp -p`) gets the REAL designer system when state is `true` — PROMPT_INJECT + all 5 skills loaded automatically
+- The test agent (`omp -p`) gets the REAL designer system when state is `true` — PROMPT_INJECT + all 12 skills loaded automatically
 - **Test output goes in `~/projects/projects/designer/test-output/`** — always `cd` there first in the prompt
 - After changing skills, copy them to `~/.omp/agent/managed-skills/` so the test picks them up
 - After changing extension code, run `omp install . --force` AND manually copy: `cp extension/index.ts ~/.omp/agent/extensions/designer/index.ts`

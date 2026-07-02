@@ -21,6 +21,17 @@ This skill provides comprehensive guidance for implementing smooth, performant, 
 | Hover effects | `ease` | 150ms |
 | Opacity only | `linear` | varies |
 
+### Canonical Timing Table
+
+| Motion type | Duration | Easing |
+|---|---|---|
+| Micro interaction (hover, focus) | 120-220ms | ease-out |
+| UI state transition (modal, dropdown) | 180-320ms | ease-in-out |
+| Entrance reveal (scroll-triggered) | 240-420ms | ease-out |
+| Large cinematic (pinned scene) | 400-800ms | custom, justified |
+
+This table is the canonical motion timing reference. Other skills (scroll-choreography, design-md, taste-skill) align with these ranges.
+
 ### CSS Custom Properties (Recommended)
 
 ```css

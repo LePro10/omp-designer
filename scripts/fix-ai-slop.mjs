@@ -113,6 +113,22 @@ const COMMERCE_CLAIM_PATTERNS = [
 /** Lines matching this are code, not copy — skip commerce claims on them. */
 const CODE_LINE_MARKER = /\b(?:function|const|let|var|export|import|return|interface|type|class)\b|=>|:.*[{;]/;
 
+function severity(label) {
+  if (label.startsWith("fake-number:") || label.startsWith("commerce:")) return "BLOCKER";
+  if (label.startsWith("real-company:")) return "BLOCKER";
+  if (label === "pattern:trusted-by") return "BLOCKER";
+  if (label === "em-dash") return "WARNING";
+  if (label.startsWith("buzzword:")) return "WARNING";
+  if (label.startsWith("overused-font:")) return "WARNING";
+  if (label.startsWith("stock-photo:")) return "WARNING";
+  if (label.startsWith("slop-color:")) return "WARNING";
+  if (label === "compound-font-ok") return "INFO";
+  if (label.startsWith("evidence:")) return "INFO";
+  if (label.startsWith("pattern:")) return "INFO";
+  return "WARNING";
+}
+
+
 function walkDir(dir) {
   const files = [];
   for (const entry of readdirSync(dir)) {
@@ -271,6 +287,7 @@ function detectCommerceClaims(content) {
 
 function detectOverusedFonts(content) {
   const results = [];
+  const compoundInfo = [];
   const lines = content.split("\n");
   const avoidanceMarkers = /anti.?pattern|avoid|what to (avoid|not)|not (use|default|allowed)|ban|forbidden|never use|do not use|MUST NOT|instead of|rather than|overused|default font/i;
 
@@ -278,12 +295,14 @@ function detectOverusedFonts(content) {
     const escaped = exception.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const exRegex = new RegExp(`['"]${escaped}['"]|family=${escaped.replace(/\s+/g, "[+\\s]+")}|${escaped}`, "gi");
     for (const m of content.matchAll(exRegex)) {
-      results.push({ label: "compound-font-ok", value: m[0], line: lineNumberForIndex(content, m.index ?? 0) });
+      const lineNum = lineNumberForIndex(content, m.index ?? 0);
+      results.push({ label: "compound-font-ok", value: m[0], line: lineNum });
+      compoundInfo.push({ label: "compound-font-ok", value: m[0], line: lineNum });
     }
   }
   const okLines = new Set(results.filter((r) => r.label === "compound-font-ok").map((r) => r.line));
 
-  return OVERUSED_FONTS.flatMap((font) => {
+  const overused = OVERUSED_FONTS.flatMap((font) => {
     const escaped = font.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "[+\\s]+");
     const regex = new RegExp(`(?:family=${escaped}|font-family[^;\n]*${escaped}|['"]${escaped}['"]|\\b${escaped}\\b)`, "gi");
     return collectMatches(content, regex, `overused-font:${font}`).filter((m) => {
@@ -293,13 +312,16 @@ function detectOverusedFonts(content) {
       return true;
     });
   });
+
+  return [...overused, ...compoundInfo];
 }
 
 function printIssues(file, issues) {
   if (issues.length === 0) return;
   console.log(`  FAIL ${file}`);
   for (const issue of issues.slice(0, 20)) {
-    console.log(`    line ${issue.line}: ${issue.label} -> "${issue.value.trim()}"`);
+    const sev = severity(issue.label);
+    console.log(`    [${sev}] line ${issue.line}: ${issue.label} -> "${issue.value.trim()}"`);
   }
   if (issues.length > 20) console.log(`    ... ${issues.length - 20} more`);
 }
@@ -319,9 +341,10 @@ const evidence = readEvidence(targetDir);
 if (evidence.exists) {
   console.log(`  EVIDENCE.md found: ${evidence.claims.length} unsupported claim(s) to watch`);
 }
-
 let totalEmDashes = 0;
-let totalIssues = 0;
+let totalBlockers = 0;
+let totalWarnings = 0;
+let totalInfo = 0;
 
 for (const file of files) {
   const original = readFileSync(file, "utf-8");
@@ -351,15 +374,20 @@ for (const file of files) {
   ], productFacts);
 
   printIssues(file, issues);
-  totalIssues += issues.length;
+  for (const issue of issues) {
+    const sev = severity(issue.label);
+    if (sev === "BLOCKER") totalBlockers++;
+    else if (sev === "WARNING") totalWarnings++;
+    else totalInfo++;
+  }
 }
 
 console.log("\nSummary:");
 console.log(`  Files scanned: ${files.length}`);
 console.log(`  Em-dashes ${mode === "fix" ? "fixed" : "found"}: ${totalEmDashes}`);
-console.log(`  Blocking issues found: ${totalIssues}`);
+console.log(`  ${totalBlockers} blockers, ${totalWarnings} warnings, ${totalInfo} info`);
 
-if (totalIssues === 0) {
+if (totalBlockers === 0 && totalWarnings === 0) {
   console.log("\nClean. No blocking AI slop detected.\n");
   process.exit(0);
 }

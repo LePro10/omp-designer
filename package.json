@@ -1,6 +1,6 @@
 {
   "name": "omp-designer",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "type": "module",
   "description": "Autonomous AI design system with 12 skills, evidence tracking, deterministic validators, 161 palettes, and 57 font pairings.",
   "keywords": [
@@ -36,6 +36,7 @@
     ]
   },
   "files": [
+    "shared/",
     "extension/",
     "extensions/",
     "skills/",
@@ -47,13 +48,16 @@
     "package.json"
   ],
   "scripts": {
+    "test:skill-gate": "node scripts/__tests__/skill-gate.test.mjs",
     "test:validators": "node scripts/__tests__/fix-ai-slop.test.mjs",
     "test:layout": "node scripts/__tests__/analyze-layout.test.mjs",
     "test:trace": "node scripts/__tests__/audit-trace.test.mjs",
     "test:prompt": "node scripts/__tests__/prompt-contract.test.mjs",
+    "test:security": "node scripts/__tests__/security.test.mjs",
     "test:eval": "node scripts/eval-suite.mjs validate",
+    "test:e2e": "node scripts/e2e-test.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "prepublishOnly": "npm run check:release && npm run test:validators && npm run test:layout && npm run test:trace && npm run test:prompt && npm run test:eval"
+    "prepublishOnly": "npm run check:release && npm run test:skill-gate && npm run test:validators && npm run test:layout && npm run test:trace && npm run test:prompt && npm run test:security && npm run test:eval"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

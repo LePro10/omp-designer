@@ -236,6 +236,7 @@ for (const section of sections) {
 }
 const blocking = [];
 const warnings = [];
+const infos = [];
 const motionIntensity = readMotionIntensity(designContent);
 const codeMotionTimingIssues = detectCodeMotionTimingIssues(srcFiles, motionIntensity);
 if (!designContent) {
@@ -263,7 +264,7 @@ const offPalette = [...usedColors].filter((color) => designColors.size > 0 && !d
 if (offPalette.length > 0) blocking.push(`Off-palette colors in src/: ${offPalette.join(", ")}`);
 
 const motionTimingIssues = detectMotionTimingIssues(designContent);
-for (const issue of motionTimingIssues) blocking.push(issue);
+for (const issue of motionTimingIssues) warnings.push(issue);
 
 
 const uniqueLayouts = [...layoutCounts.keys()].filter((layout) => layout !== "unknown");
@@ -271,7 +272,7 @@ if (sections.length >= 4 && uniqueLayouts.length < 3) warnings.push("Less than 3
 if (fontSizes.size < 4) warnings.push("Less than 4 text size classes detected; hierarchy may be flat");
 
 const nonResponsive = sections.filter((section) => !section.hasResponsive && section.layout !== "unknown");
-if (nonResponsive.length > 0) warnings.push(`Sections without responsive class hints: ${nonResponsive.map((section) => section.name).join(", ")}`);
+if (nonResponsive.length > 0) infos.push(`Sections without responsive class hints: ${nonResponsive.map((section) => section.name).join(", ")}`);
 
 const riskyHorizontal = sections.filter((section) => section.riskyHorizontal);
 if (riskyHorizontal.length > 0) blocking.push(`Horizontal scroll without obvious mobile fallback: ${riskyHorizontal.map((section) => section.name).join(", ")}`);
@@ -281,8 +282,8 @@ const reducedMotionCoverage = sections.some((section) => section.hasReducedMotio
 
 const tabletRequiredLayouts = new Set(["bento-grid", "multi-column-grid", "horizontal-scroll", "pinned-scroll"]);
 const missingTablet = sections.filter((section) => tabletRequiredLayouts.has(section.layout) && !section.hasTablet);
-if (missingTablet.length > 0) blocking.push(`Complex sections without tablet (1024px/lg) breakpoint coverage: ${missingTablet.map((section) => section.name).join(", ")}`);
-if (animatedSections.length > 0 && !reducedMotionCoverage) warnings.push("Animations detected but no reduced-motion handling found");
+if (missingTablet.length > 0) warnings.push(`Complex sections without tablet (1024px/lg) breakpoint coverage: ${missingTablet.map((section) => section.name).join(", ")}`);
+if (animatedSections.length > 0 && !reducedMotionCoverage) infos.push("Animations detected but no reduced-motion handling found");
 
 console.log("SECTIONS:");
 for (const section of sections) {
@@ -307,17 +308,29 @@ const allMotionIssues = [...motionTimingIssues, ...codeMotionTimingIssues];
 if (allMotionIssues.length === 0) {
   console.log("  DESIGN.md and component timings within default ranges or not specified");
 } else {
-  for (const issue of allMotionIssues) console.log(`  FAIL ${issue}`);
+  for (const issue of allMotionIssues) console.log(`  [WARNING] ${issue}`);
 }
 
 if (warnings.length > 0) {
   console.log("\nWARNINGS:");
-  for (const warning of warnings) console.log(`  WARN ${warning}`);
+  for (const warning of warnings) console.log(`  [WARNING] ${warning}`);
 }
+
+if (infos.length > 0) {
+  console.log("\nINFO:");
+  for (const info of infos) console.log(`  [INFO] ${info}`);
+}
+
+console.log(`\n${blocking.length} blockers, ${warnings.length} warnings, ${infos.length} info`);
 
 if (blocking.length > 0) {
   console.log("\nBLOCKING:");
-  for (const item of blocking) console.log(`  FAIL ${item}`);
+  for (const item of blocking) console.log(`  [BLOCKER] ${item}`);
+  console.log("");
+  process.exit(1);
+}
+
+if (warnings.length > 0) {
   console.log("");
   process.exit(1);
 }
