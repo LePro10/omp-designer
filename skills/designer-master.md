@@ -21,16 +21,58 @@ Classify the task before acting:
 
 Honor explicit interaction requests:
 
-- If the user asks for a plan or approval, wait after presenting the plan.
+- If the user asks for a plan or approval, treat the current turn as read-only:
+  inspect, present the plan, and wait. Do not create artifacts, scaffold code,
+  install dependencies, or start implementation before approval.
 - If the user asks you to build immediately, proceed without preference questions.
 - Otherwise ask no more than two questions, only when the answer changes scope,
   brand direction, content truth, or implementation architecture.
 
 Do not force an emotion quiz or a fixed questionnaire.
 
+### Priority of decisions
+
+When guidance conflicts, resolve it in this order:
+
+1. **User decision beats style preference.** An explicit user choice about layout,
+   direction, motion, or components overrides a taste rule in these skills. If the
+   user asks for something a rule discourages, do it and note the tradeoff rather
+   than silently overriding them.
+2. **User-provided brand, product, and facts beat generic defaults.** A supplied
+   palette, token set, or content truth wins over any default suggestion here.
+3. **Non-negotiable blockers.** Factual integrity, accessibility basics, security,
+   and working navigation are not overridable by preference. Do not ship invented
+   claims, inaccessible essentials, insecure patterns, or broken links even on
+   request; offer a truthful, accessible alternative instead.
+
+Taste rules are guidance: treat them as warnings that need judgment, not as bans.
+Blockers are the small set above.
+
+### Approval-plan check
+
+Before presenting a plan:
+
+1. Extract the user's explicit deliverables and map each one to the plan.
+2. Preserve requested architecture. "Several pages" means named routes/pages, not
+   several sections on one page, unless the user approves that tradeoff.
+3. Keep the plan concise and decision-oriented: direction, pages and their
+   purpose, interaction narrative, responsive behavior, stack, and risks.
+4. Apply evidence and behavior constraints now. Do not plan fake metrics,
+   testimonials, forms without a destination, or unsupported capabilities.
+5. Treat scripted AI behavior as a visibly labelled demo, not "live reasoning."
+   Historical claims need a source-verification step; future claims need an
+   explicit speculative label.
+6. Report process evidence literally. Do not say a skill, reference, browser, or
+   test was used unless the corresponding action occurred.
+7. End at the requested approval boundary without writing project files.
+
+For delegated art direction such as "surprise me", make a defensible choice
+instead of adding another preference question.
+
 ## 2. Ground the work
 
-For a new page or major redesign, create concise artifacts:
+After approval and before implementation of a new page or major redesign, create
+concise artifacts:
 
 ### PRODUCT.md
 

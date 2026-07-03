@@ -87,12 +87,40 @@ inspection rather than block the workflow.
 - State is per working directory.
 - `OMP_DESIGNER_MODE=1` or `0` overrides persisted state for automation.
 - Skills and data are read from the installed package.
-- No tool is blocked until a skill is read.
+- No tool is blocked, and no skill read is technically enforced. There is no
+  `tool_call`/`tool_result` gate and no skill-read hard gate.
 - Small edits stay small; artifacts are reserved for new pages and major
   redesigns.
 - Product claims require user or source evidence.
 - Warnings require judgment; only objective blockers prevent delivery.
-- Delivery continuation is bounded and must never form an autonomous loop.
+- On OMP, delivery checks are a post-execution backstop that runs only after real
+  project files change in the session; a chat/planning turn spawns no build.
+  Delivery continuation is bounded and must never form an autonomous loop.
+- Pi is prompt-only plus plan checks. Pi has no delivery-check backstop. Do not
+  document or assume Pi/OMP parity.
+
+## v5 invariants (do not regress)
+
+Future agents working on this package must not:
+
+- Resurrect the v4 skill-read hard gate, the ten-phase state machine, or any
+  `tool_call`/`tool_result` tool gating, unless a maintainer explicitly asks. v4
+  gating was removed on purpose: it measured ritual skill-read completion rather
+  than interface quality. v5 relies on the focused prompt, plan checks,
+  post-execution delivery checks, telemetry, and evals instead.
+- Claim Pi has technical enforcement or a delivery backstop.
+- Treat unit or simulated host-bridge tests as real-model E2E evidence. The
+  `test:e2e` suite and `e2e-smoke.mjs` simulate the host contract; they do not
+  prove a live OMP run. Real-model runs (`real-agent-eval.mjs`) are manual and may
+  be `SKIPPED` without credentials.
+- Store live keys anywhere in the repository or working tree. `.env` is gitignored
+  and must stay outside the repo; use `.env.example` as the template.
+- Reintroduce MCP mutation as a form of enforcement.
+
+Before any release decision, run the P0/P1/P2 checks: `npm test` (includes
+`test:e2e`), `npm run check:release`, and confirm the working tree is clean with a
+version bump. Skill-read observability is limited unless the host exposes read
+events; prove behavior through delivery checks and evals, not "all skills read".
 
 ## Required checks for package changes
 
@@ -111,8 +139,10 @@ node scripts/real-agent-eval.mjs \
   --model opencode-go/deepseek-v4-flash:xhigh
 ```
 
-Keep generated projects and reports under `test-output/`. Inspect at least one
-desktop and one mobile screenshot. The automated score covers delivery evidence,
+Keep generated projects and reports under `test-output/`. Reclaim disk with
+`npm run cleanup:artifacts` (dry-run first; `--apply` deletes generated runs and
+retains reports/e2e-canary evidence). Inspect at least one desktop and one mobile
+screenshot. The automated score covers delivery evidence,
 not visual quality; record visual findings separately.
 
 Before a real-agent comparison, ensure `/designer-doctor` reports one package
@@ -124,8 +154,10 @@ mixed installation as release evidence.
 
 - Never read entire CSV datasets when a targeted search and range read is enough.
 - Never place API keys, npm tokens, auth headers, or `.env` values in chat, CLI
-  arguments, traces, fixtures, or commits.
-- Never publish before `npm run check:release`.
+  arguments, traces, fixtures, or commits. Keep `.env` outside the repo; if a live
+  key was ever exposed in the working tree, rotate it.
+- Never publish before `npm run check:release`, and never publish from a dirty
+  working tree or without a version bump.
 - Do not hardcode a user's home directory.
 - Preserve unrelated work in a dirty tree.
 - Update skills only when model-backed evidence points to a workflow problem.

@@ -68,12 +68,54 @@ preconditions for release-candidate model runs. The harness also stopped passing
 an explicit extension path beside the installed plugin. The first clean,
 single-source comparison is R8.
 
+### Approval plans ignored explicit page scope
+
+A real DeepSeek plan read the design skills but replaced "various pages" with a
+single long page, overpromised effects, and later rationalized the miss. Prompt
+guidance alone remained inconsistent across repeated runs. Plan-only turns now
+use a smaller prompt without delivery-review instructions and a bounded runtime
+check for objective scope, route, form, metrics, dead-link, source, and native
+scroll violations. The same prompt reached `plan_checks_passed` after one rewrite
+in R8 without creating project files.
+
 ### Automated score was mistaken for design quality
 
 The first v5 DeepSeek run reached 100/100 while screenshots still showed three
 repetitive card-grid sections. The report now labels its number as an automated
 delivery score and emits composition signals. A written screenshot review is part
 of every comparison.
+
+## Repair status (v5 audit follow-up)
+
+Tracked against `docs/repair-plan-v5.md`.
+
+- **P0 — Security / release hygiene: done.** A live key that sat in the working
+  tree was removed from the repo and relocated outside it; `.env` stays gitignored
+  with a safe `.env.example`. `check-release` now scans the repo working tree
+  (dotfiles, docs, tests, examples) in addition to the packed tarball, using the
+  shared `shared/security.mjs` pattern source. The exposed key must still be
+  rotated by the owner.
+- **P1 — Core logic correctness: done.** Secret patterns consolidated into
+  `shared/security.mjs` (runtime redaction and release scan share one source).
+  Plan-intent detection rewritten (robust English, German fallback, no
+  "review my existing plan and implement it" false positive). Plan length ceiling
+  and prompt now agree, with an explicit detailed-specification bypass.
+  `session_stop` delivery checks run only after real file changes, and fallback
+  session ids use a monotonic token to avoid same-cwd collisions.
+- **P2 — Host-bridge evidence: done.** `scripts/__tests__/host-bridge.test.ts`
+  simulates the OMP/Pi host event contract against the real adapters (registration,
+  one-time prompt injection, four-skill discovery, plan-continuation exactness,
+  delivery-check gating, duplicate-load, OMP/Pi difference, id collision
+  resistance). `scripts/e2e-smoke.mjs` reports the same as a smoke run. This is
+  simulated, not live-OMP, proof.
+- **Real OMP smoke: unverified.** `--real-omp` remains `SKIPPED` without a local
+  OMP and model credentials; no automated real-model E2E has passed.
+- **Remaining:** P3 documentation consistency (this pass), P4 designer-quality and
+  eval rubric, P5 performance/context cost, P6 release readiness (version bump,
+  tag, clean-tree publish).
+- **Publish: NO-GO** until the exposed key is rotated and git/version hygiene is
+  satisfied (clean tree, version bump, tag). Architecture is otherwise sound; a
+  return to the v4 gate would be wrong.
 
 ## Deliberate limitations
 

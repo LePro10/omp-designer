@@ -14,9 +14,14 @@ function fixture(events) {
   return { dir, file };
 }
 
-function run(events, strict = false) {
+function run(events, strict = false, plan = false) {
   const data = fixture(events);
-  const result = spawnSync(process.execPath, [script, data.file, ...(strict ? ["--strict"] : [])], {
+  const result = spawnSync(process.execPath, [
+    script,
+    data.file,
+    ...(strict ? ["--strict"] : []),
+    ...(plan ? ["--plan"] : []),
+  ], {
     encoding: "utf8",
   });
   rmSync(data.dir, { recursive: true, force: true });
@@ -50,4 +55,16 @@ console.log("ok - rejects legacy gate events");
 assert.equal(run(valid.slice(0, 2), true).status, 1);
 console.log("ok - strict mode requires passed delivery checks");
 
-console.log("\n4 trace tests passed");
+const validPlan = [
+  { timestamp: "2026-01-01T00:00:00.000Z", cwd: "/tmp/plan", event: "prompt_injected" },
+  { timestamp: "2026-01-01T00:00:10.000Z", cwd: "/tmp/plan", event: "plan_checks_failed" },
+  { timestamp: "2026-01-01T00:00:20.000Z", cwd: "/tmp/plan", event: "prompt_injected" },
+  { timestamp: "2026-01-01T00:00:30.000Z", cwd: "/tmp/plan", event: "plan_checks_passed" },
+];
+assert.equal(run(validPlan, true, true).status, 0);
+console.log("ok - accepts bounded plan repair trace");
+
+assert.equal(run(validPlan.slice(0, 2), true, true).status, 1);
+console.log("ok - strict plan mode requires a passed plan");
+
+console.log("\n6 trace tests passed");

@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { findSecrets } from "./security.mjs";
+import { findSecrets, scanTree } from "../shared/security.mjs";
 
 const root = process.cwd();
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -71,6 +71,12 @@ for (const file of packedFiles) {
     const line = content.slice(0, finding.index).split("\n").length;
     failures.push(`${finding.label}: ${file}:${line}`);
   }
+}
+
+// Repo-wide secret scan: packed files alone miss dotfiles (.env), docs, tests,
+// and examples that still live in the working tree an agent has access to.
+for (const finding of await scanTree(root)) {
+  failures.push(`${finding.label} in working tree: ${finding.file}:${finding.line}`);
 }
 
 const extension = readFileSync(join(root, "extension", "index.ts"), "utf8");
