@@ -101,7 +101,40 @@ The mode is stored per project. `OMP_DESIGNER_MODE=1` and
 - `review-skill`: delivery and browser review
 
 Skills remain package-relative. There is no managed-skill copy and no requirement
-to read every skill before using tools.
+to read every skill before using tools. Skill reads are not technically enforced;
+v5 relies on the focused prompt, plan checks, delivery checks, and evals rather
+than a skill-read gate. Where the host does not emit read events, skill
+consumption is not directly observable.
+
+## Hosts: OMP and Pi
+
+The two adapters share prompt injection, four-skill discovery, plan-intent
+detection, and one bounded plan-only continuation. They are not at parity:
+
+| Capability | OMP (`extension/index.ts`) | Pi (`extensions/designer.ts`) |
+| --- | --- | --- |
+| Focused prompt injection | yes | yes |
+| Four-skill `resources_discover` | yes | yes |
+| Plan-intent detection + bounded plan-only continuation | yes | yes |
+| Post-execution delivery checks (quality/layout/build on `session_stop`) | yes | no |
+| Trace events under `~/.omp/agent/designer-traces` | yes | no |
+| Tool interception / skill-read hard gate | none | none |
+| MCP mutation | none | none |
+
+Pi is prompt-only plus plan checks. It has no delivery-check backstop; the OMP
+`session_stop` delivery path is host-specific and is not mirrored on Pi.
+
+## Security and key hygiene
+
+- No API key belongs in this repository. `.env` is gitignored; keep real
+  credentials outside the repo (for example under `~/.config/…` sourced by your
+  shell) and copy `.env.example` when you need a local `.env`.
+- If a live key was ever committed or left in the working tree, rotate it.
+- `npm run check:release` scans both the packed tarball and the repo working tree
+  (including dotfiles) for secret patterns. Placeholders such as
+  `<YOUR_OPENAI_API_KEY>` are allowed; real-looking secrets fail the check.
+- Runtime trace redaction and the release scanner share one pattern source,
+  `shared/security.mjs`.
 
 ## MCP policy
 
@@ -136,6 +169,33 @@ held in extension memory. Agent-generated PRODUCT.md or EVIDENCE.md cannot
 self-authorize a fact. Standalone CLI use falls back to those ledgers unless
 `DESIGNER_USER_FACTS` is supplied.
 
+Approval-plan turns use a separate read-only prompt without delivery-review
+instructions. A bounded plan check catches objective scope failures such as
+collapsing requested pages into one page, missing concrete routes, unsolicited
+forms or metrics, dead links, and scroll-jacking. It may request one rewrite and
+never forms an autonomous loop. An explicitly requested detailed specification is
+allowed to exceed the length ceiling; an unrequested overlong plan gets one
+tightening continuation, not a hard rejection.
+
+On OMP, `session_stop` delivery checks are a post-execution backstop, not
+pre-execution enforcement. They run only after real project files change during a
+session; a pure chat or planning turn spawns no build. A failed check yields one
+bounded repair continuation. Pi does not run this backstop.
+
+### Simulated host-bridge and optional real smoke
+
+```bash
+npm run test:e2e     # simulated OMP/Pi host contract against the real adapters
+npm run e2e:smoke    # same, as a reportable smoke run (add --real-omp to attempt)
+```
+
+`test:e2e` drives the real adapter hooks through a simulated host (no model, no
+live OMP process): registration, one-time prompt injection, skill discovery,
+plan continuation exactness, delivery-check gating, duplicate-load, and the
+OMP/Pi capability difference. It is simulated evidence, not proof that a live
+OMP host emits identical event shapes. `e2e:smoke --real-omp` is optional and
+reports `SKIPPED` (never `PASS`) when OMP or model credentials are unavailable.
+
 Run validators against another project:
 
 ```bash
@@ -145,7 +205,16 @@ node scripts/analyze-layout.mjs /path/to/project
 
 ## Real-agent comparison
 
-Generated projects and reports are kept under `test-output/`:
+Generated projects and reports are kept under `test-output/` (gitignored, never
+packed). This directory can grow to gigabytes; reclaim space with a dry-run-first
+cleanup that retains the JSON reports and e2e-canary as release evidence:
+
+```bash
+npm run cleanup:artifacts             # dry run: lists what it would remove
+npm run cleanup:artifacts -- --apply  # delete generated runs, keep evidence
+```
+
+Real-agent runs themselves:
 
 ```bash
 node scripts/real-agent-eval.mjs \
@@ -161,6 +230,12 @@ comparison in `test-output/reports/`. A run is invalid unless its isolated trace
 proves prompt injection, a delivery outcome, and no adjacent duplicate hook event.
 Generation refuses to start unless OMP reports this checkout as the sole clean
 v5 plugin source. The harness does not add a second explicit extension path.
+
+This harness is a manual tool: it needs a local `omp`, a model provider, and
+credentials, and its artifacts live in untracked `test-output/`. It is not part
+of `npm test` and is not automated clean-install E2E evidence. The simulated
+`test:e2e` host-bridge suite is the automated adapter evidence; a real-model run
+here is complementary manual verification.
 
 Its numeric score measures delivery evidence, not visual taste. Screenshots must
 still be reviewed. A valid iteration is:
@@ -188,18 +263,22 @@ double-load.
 ## Runtime structure
 
 ```text
-extension/index.ts               omp extension
-extensions/designer.ts           Pi extension
+extension/index.ts               omp extension (prompt, plan checks, delivery backstop)
+extensions/designer.ts           Pi extension (prompt + plan checks, no backstop)
+shared/security.mjs              shared secret patterns for redaction and release scan
 skills/                          four conditional skills
 data/ui-ux-pro-max/              palette and typography search data
 scripts/fix-ai-slop.mjs          evidence-aware copy validator
 scripts/analyze-layout.mjs       proportional layout/contrast validator
 scripts/audit-data.mjs           CSV integrity and contrast audit
 scripts/audit-trace.mjs          duplicate-load and delivery trace audit
-scripts/real-agent-eval.mjs      real model comparison harness
-scripts/check-release.mjs        packed-artifact and secret release gate
+scripts/real-agent-eval.mjs      manual real-model comparison harness
+scripts/e2e-smoke.mjs            simulated host-bridge smoke runner (optional --real-omp)
+scripts/check-release.mjs        packed-artifact and repo-wide secret release gate
+scripts/cleanup-artifacts.mjs    dry-run-first cleanup for generated test-output
 scripts/install-local.mjs        safe local-link installer
 scripts/uninstall-system.mjs     dry-run-first omp cleanup
+scripts/__tests__/host-bridge.test.ts  simulated OMP/Pi host-contract tests
 ```
 
 ## Requirements

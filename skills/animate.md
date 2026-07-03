@@ -38,6 +38,9 @@ Avoid `transition: all`.
 
 - Use at most one major scroll-driven scene unless the brief is explicitly
   narrative.
+- Apply that budget across a multi-page site, not once per route. A request for
+  "scroll effects" does not automatically authorize a major scrubbed scene on
+  every page.
 - Do not hide essential content behind a viewport trigger.
 - Do not override native scroll.
 - A desktop pinned or horizontal sequence needs a simple mobile alternative.

@@ -8,6 +8,12 @@ description: "Create a compact visual-system contract for new pages and major re
 Use this skill for a new page, a major redesign, or work that introduces a new
 visual language. Skip it for small edits inside an established system.
 
+During a user-requested plan/approval turn, propose the visual direction without
+writing DESIGN.md. Create the file after approval and before implementation.
+Exact tokens are provisional until checked. Do not attribute a palette or type
+choice to a CSV row unless the complete row was actually read, and do not claim
+contrast compliance until the intended foreground/background pair was measured.
+
 ## DESIGN.md contract
 
 Keep DESIGN.md short enough to use while building:

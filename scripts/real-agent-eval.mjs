@@ -20,6 +20,7 @@ import {
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { inspectOmpSystem } from "./lifecycle-lib.mjs";
+import { buildDesignQualityReport } from "../shared/design-quality.mjs";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -41,6 +42,10 @@ const prompts = {
   saas: "Build a responsive one-page website for Fieldnote, a tool that helps small field-service teams keep site notes, photos, decisions, and follow-up tasks together. Use React and TypeScript. This is an early product, so do not invent prices, customer logos, metrics, testimonials, certifications, or integrations. Make the result specific to work happening on physical job sites. Build immediately without asking questions.",
   editorial: "Build a responsive long-form article page for an independent architecture journal. Reading hierarchy, image captions, references, and mobile typography matter more than a dramatic hero. Use React and TypeScript. Build immediately without asking questions.",
   edit: "Inspect the existing project and improve only its header and hero. Preserve its routes, copy facts, dependencies, and visual identity. Do not add sections or rewrite the application.",
+  surprise: "Build a responsive landing page for a small-batch coffee roaster's subscription. Surprise me with the art direction; you decide the mood and typography. Do not invent metrics, awards, or testimonials. Build immediately without asking questions.",
+  multipage: "Build a responsive multi-page site for a community woodworking studio: a home page, a classes page, and a contact page as separate routes. Provide real navigation between them. Do not invent prices or class schedules. Build immediately without asking questions.",
+  "plan-en": "Create a plan for a multi-page portfolio site and wait for my approval before building anything.",
+  "plan-de": "Erstelle zuerst einen Plan für eine mehrseitige Portfolio-Website und warte auf meine Freigabe, bevor du etwas umsetzt.",
 };
 
 if (!runName && !evaluateOnly) {
@@ -234,6 +239,13 @@ function evaluate(dir, userFacts = "") {
   const freshScreenshotCount = screenshotMtimes.filter((mtime) => mtime >= latestSourceMtime).length;
   const screenshotsFresh = freshScreenshotCount >= 2;
   const composition = compositionSignals(dir);
+  const designQuality = buildDesignQualityReport({
+    projectDir: dir,
+    userPrompt: userFacts,
+    quality: quality.report,
+    layout: layout.report,
+    composition,
+  });
   const qualityBlockers = quality.report?.blockers ?? 99;
   const layoutBlockers = layout.report?.blockers ?? 99;
   const warnings = (quality.report?.warnings ?? 0) + (layout.report?.warnings ?? 0);
@@ -263,7 +275,8 @@ function evaluate(dir, userFacts = "") {
     sourceFiles,
     warnings,
     composition,
-    scoreScope: "Automated delivery score; visual quality requires screenshot review.",
+    designQuality,
+    scoreScope: "Automated delivery score; visual quality requires the designReview rubric and screenshot review.",
   };
 }
 

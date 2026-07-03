@@ -1,14 +1,22 @@
 /**
  * omp-designer v5 extension for Pi.
  *
- * Pi receives the same focused workflow as OMP, without tool interception or
- * MCP configuration mutation.
+ * Pi shares OMP's prompt injection, four-skill discovery, plan-intent detection,
+ * and bounded plan-only continuation. It is NOT at parity with OMP: Pi has no
+ * post-execution delivery-check backstop (no build/validator run on session_stop)
+ * and, like OMP, never intercepts tools or mutates MCP configuration.
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { DESIGNER_PROMPT, DESIGNER_SKILLS } from "../extension/index.ts";
+import {
+  DESIGNER_PROMPT,
+  DESIGNER_SKILLS,
+  PLAN_ONLY_PROMPT,
+  asksForApprovalPlan,
+  planChecks,
+} from "../extension/index.ts";
 
 const AGENT_ROOT = join(homedir(), ".pi", "agent");
 const STATE_FILE = join(AGENT_ROOT, "designer-state.json");
@@ -80,7 +88,28 @@ function normalizePrompts(value: unknown): string[] {
   return typeof value === "string" ? [value] : [];
 }
 
+function messageText(value: unknown): string {
+  const content = asRecord(value).content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((block) => {
+      const record = asRecord(block);
+      return record.type === "text" && typeof record.text === "string" ? record.text : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export default function designerExtension(pi: PiExtensionAPI): void {
+  const userPromptByCwd = new Map<string, string>();
+  const planRepairAttempts = new Map<string, number>();
+  // A monotonic per-session token, used to build a collision-resistant fallback
+  // id when the host omits session_id — a plain timestamp collides when two
+  // sessions in the same cwd start within the same millisecond.
+  const sessionTokenByCwd = new Map<string, string>();
+  let sessionCounter = 0;
+
   pi.registerCommand("designer", {
     description: "Toggle the focused designer workflow for this project",
     handler: (_args, ctx) => {
@@ -121,9 +150,53 @@ export default function designerExtension(pi: PiExtensionAPI): void {
   pi.on("before_agent_start", (event, ctx) => {
     const cwd = ctx?.cwd ?? process.cwd();
     if (!isEnabled(cwd)) return;
+    const userPrompt = typeof asRecord(event).prompt === "string" ? String(asRecord(event).prompt) : "";
+    const isContinuation = userPrompt.includes("[DESIGNER PLAN CHECKS FAILED]");
+    if (userPrompt && !isContinuation) {
+      userPromptByCwd.set(cwd, userPrompt);
+    }
+    if (!isContinuation || !sessionTokenByCwd.has(cwd)) {
+      sessionTokenByCwd.set(cwd, `${Date.now()}-${++sessionCounter}`);
+    }
     const prompts = normalizePrompts(asRecord(event).systemPrompt)
       .map((prompt) => prompt.replace(PROMPT_MARKER_RE, "\n").trim())
       .filter(Boolean);
-    return { systemPrompt: [...prompts, DESIGNER_PROMPT] };
+    return {
+      systemPrompt: [
+        ...prompts,
+        asksForApprovalPlan(userPrompt) ? PLAN_ONLY_PROMPT : DESIGNER_PROMPT,
+      ],
+    };
+  });
+
+  pi.on("session_stop", (event, ctx) => {
+    const cwd = ctx?.cwd ?? process.cwd();
+    if (!isEnabled(cwd)) return;
+    const userPrompt = userPromptByCwd.get(cwd) ?? "";
+    if (!asksForApprovalPlan(userPrompt)) return;
+
+    const eventRecord = asRecord(event);
+    const sessionId = typeof eventRecord.session_id === "string" && eventRecord.session_id
+      ? String(eventRecord.session_id)
+      : `${cwd}:${sessionTokenByCwd.get(cwd) ?? "nostart"}`;
+    const result = planChecks(userPrompt, messageText(eventRecord.last_assistant_message));
+    if (result.ok) {
+      planRepairAttempts.delete(sessionId);
+      return;
+    }
+
+    const attempt = (planRepairAttempts.get(sessionId) ?? 0) + 1;
+    planRepairAttempts.set(sessionId, attempt);
+    if (attempt >= 2) return;
+    return {
+      continue: true,
+      additionalContext: [
+        "[DESIGNER PLAN CHECKS FAILED]",
+        "Rewrite only the approval plan. Do not create or modify project files.",
+        ...result.violations.map((violation) => `- ${violation}`),
+        "End by waiting for approval.",
+        "[/DESIGNER PLAN CHECKS FAILED]",
+      ].join("\n"),
+    };
   });
 }

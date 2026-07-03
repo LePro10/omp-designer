@@ -41,9 +41,10 @@ return { systemPrompt: [...basePrompts, DESIGNER_PROMPT] };
 | --- | --- |
 | `resources_discover` | expose four package-relative skills |
 | `before_agent_start` | inject one current designer prompt |
-| `session_stop` | bounded validator/build backstop |
+| `session_stop` | OMP: bounded plan check + post-execution validator/build backstop. Pi: plan check only |
 
 `tool_call` and `tool_result` are intentionally not used for workflow gating.
+There is no skill-read hard gate.
 
 ## Session-stop result
 
@@ -65,7 +66,8 @@ request continuation.
 An extension can be discovered through more than one loader realm. Use a
 process-wide marker and an atomic process-scoped lock in addition to a
 `globalThis` symbol. The integration test calls the factory twice and expects one
-command/handler set; a real CLI smoke test verifies separate loader realms.
+command/handler set; the simulated host-bridge test additionally imports a second
+loader realm and confirms it registers no duplicate hooks.
 
 ## Context
 

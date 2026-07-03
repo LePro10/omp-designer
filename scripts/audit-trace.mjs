@@ -7,8 +7,9 @@ import { readFileSync } from "node:fs";
 
 const path = process.argv[2];
 const strict = process.argv.includes("--strict");
+const plan = process.argv.includes("--plan");
 if (!path || path === "--help" || path === "-h") {
-  console.log("Usage: node scripts/audit-trace.mjs <trace.jsonl> [--strict]");
+  console.log("Usage: node scripts/audit-trace.mjs <trace.jsonl> [--strict] [--plan]");
   process.exit(path ? 0 : 2);
 }
 
@@ -51,17 +52,19 @@ if (duplicateEvents.length > 0) {
   failures.push(`probable duplicate extension load at ${duplicateEvents.length} adjacent events`);
 }
 if (!counts.prompt_injected) failures.push("missing prompt_injected");
-if (!counts.delivery_checks_passed && !counts.delivery_checks_failed) {
-  failures.push("missing delivery check outcome");
+const passedEvent = plan ? "plan_checks_passed" : "delivery_checks_passed";
+const failedEvent = plan ? "plan_checks_failed" : "delivery_checks_failed";
+if (!counts[passedEvent] && !counts[failedEvent]) {
+  failures.push(`missing ${plan ? "plan" : "delivery"} check outcome`);
 }
 if (counts.skill_gate_blocked || counts.session_stop_gate_not_ready) {
   failures.push("legacy skill-gate events are present");
 }
-if ((counts.delivery_checks_failed ?? 0) > 2) {
-  failures.push("more than two delivery failures indicate a continuation loop");
+if ((counts[failedEvent] ?? 0) > 2) {
+  failures.push(`more than two ${plan ? "plan" : "delivery"} failures indicate a continuation loop`);
 }
-if (strict && !counts.delivery_checks_passed) failures.push("strict: delivery checks never passed");
-if (!strict && !counts.delivery_checks_passed) warnings.push("delivery checks did not pass");
+if (strict && !counts[passedEvent]) failures.push(`strict: ${plan ? "plan" : "delivery"} checks never passed`);
+if (!strict && !counts[passedEvent]) warnings.push(`${plan ? "plan" : "delivery"} checks did not pass`);
 
 const report = {
   trace: path,
@@ -71,6 +74,7 @@ const report = {
   counts,
   duplicateEvents,
   strict,
+  plan,
   failures,
   warnings,
 };

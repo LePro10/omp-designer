@@ -8,6 +8,9 @@ description: "Proportional delivery review for implemented frontend work."
 Review the result that exists. Do not regenerate the whole interface to satisfy a
 style checklist.
 
+This is a delivery skill, not a planning prerequisite. Do not read or execute it
+during a plan-only approval turn when no implementation exists.
+
 ## 1. Automated checks
 
 From the project root:

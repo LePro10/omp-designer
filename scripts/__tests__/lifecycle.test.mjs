@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -22,6 +23,9 @@ import { installLocal } from "../install-local.mjs";
 import { uninstallSystem } from "../uninstall-system.mjs";
 
 const packageRoot = resolve(new URL("../..", import.meta.url).pathname);
+// Derive the expected version from package.json so a version bump does not break
+// these lifecycle assertions.
+const pkgVersion = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version;
 const tests = [];
 
 function test(name, fn) {
@@ -104,7 +108,7 @@ test("inspection finds plugin metadata and exact legacy paths", () => {
     }));
 
     const report = inspectOmpSystem(home);
-    assert.equal(report.plugin.version, "5.0.0");
+    assert.equal(report.plugin.version, pkgVersion);
     assert.equal(report.plugin.lockVersion, "4.0.0");
     assert.equal(report.legacy.extensionExists, true);
     assert.deepEqual(
@@ -279,8 +283,8 @@ test("clean local install and uninstall work in an isolated HOME", () => {
 
     const installed = inspectOmpSystem(home);
     assert.equal(installed.plugin.realpath, packageRoot);
-    assert.equal(installed.plugin.version, "5.0.0");
-    assert.equal(installed.plugin.lockVersion, "5.0.0");
+    assert.equal(installed.plugin.version, pkgVersion);
+    assert.equal(installed.plugin.lockVersion, pkgVersion);
     assert.equal(installed.legacy.extensionExists, false);
     assert.equal(installed.legacy.managedSkills.length, 0);
     assert.equal(installed.retainedData.stateExists, true);
