@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const script = new URL("../analyze-layout.mjs", import.meta.url).pathname;
 const cases = [];
@@ -13,92 +13,74 @@ function test(name, fn) {
 }
 
 function fixture(files) {
-  const dir = mkdtempSync(join(tmpdir(), "analyze-layout-"));
+  const dir = mkdtempSync(join(tmpdir(), "designer-layout-"));
   for (const [path, content] of Object.entries(files)) {
     const full = join(dir, path);
-    mkdirSync(full.split("/").slice(0, -1).join("/"), { recursive: true });
+    mkdirSync(dirname(full), { recursive: true });
     writeFileSync(full, content);
   }
   return dir;
 }
 
-function run(dir) {
-  return spawnSync(process.execPath, [script, dir], { encoding: "utf-8" });
+function run(dir, json = false) {
+  return spawnSync(process.execPath, [script, ...(json ? ["--json"] : []), dir], { encoding: "utf8" });
 }
 
-const app = (color) => `export default function App(){return <main style={{color:'${color}'}}><h1 className="text-sm text-base text-lg text-xl">Test</h1></main>}`;
-
-test("allows user-provided brand colors outside CSV", () => {
-  const dir = fixture({
-    "PRODUCT.md": "Provided facts\n- Source: user Brand colors #123C69 and #E8B04A\n",
-    "DESIGN.md": "Palette\n- Brand navy #123C69 (Source: user)\n- Brand gold #E8B04A (Source: user)\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
-    "src/App.tsx": app("#123C69"),
-  });
+test("small edit without DESIGN.md warns but passes", () => {
+  const dir = fixture({ "src/App.tsx": "export default () => <main className=\"md:grid\"><h1>Test</h1></main>;\n" });
   try {
     const result = run(dir);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /allowed non-CSV: #123c69, #e8b04a/);
+    assert.match(result.stdout, /design-contract-missing/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("allows documented derivations from user brand colors", () => {
+test("off-contract source color warns but does not block", () => {
   const dir = fixture({
-    "PRODUCT.md": "Provided facts\n- Source: user Brand color #123C69\n",
-    "DESIGN.md": "Palette\n- Brand navy #123C69 (Source: user)\n- Accent mist #8BE9D4 (derived from #123C69 for interactive focus states)\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
-    "src/App.tsx": app("#8BE9D4"),
+    "DESIGN.md": "## Color\n- Primary #123C69\n",
+    "src/App.tsx": "export default () => <main style={{ color: '#8BE9D4' }}><h1>Test</h1></main>;\n",
   });
   try {
     const result = run(dir);
-    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /undocumented-source-color/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("blocks undocumented invented design colors", () => {
+test("animation without reduced motion warns but passes", () => {
   const dir = fixture({
-    "DESIGN.md": "Palette\n- Accent #8BE9D4\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
-    "src/App.tsx": app("#8BE9D4"),
+    "DESIGN.md": "## Color\n- Primary #123C69\n",
+    "src/App.tsx": "export default () => <motion.main animate={{opacity: 1}}><h1>Test</h1></motion.main>;\n",
   });
   try {
     const result = run(dir);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout, /not in CSV palette or documented user\/brand derivation/);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /reduced-motion-missing/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-
-test("blocks complex grids without tablet breakpoint coverage", () => {
+test("JSON output has stable counts", () => {
   const dir = fixture({
-    "DESIGN.md": "Palette\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
-    "src/App.tsx": "export default function App(){return <section className=\"grid grid-cols-1 md:grid-cols-3 gap-6\"><h1 className=\"text-sm text-base text-lg text-xl\">Test</h1></section>}",
+    "DESIGN.md": "## Color\n- Primary #123C69\n",
+    "src/App.tsx": "export default () => <main className=\"md:grid\" style={{color:'#123C69'}}><h1>Test</h1></main>;\n",
   });
   try {
-    const result = run(dir);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout, /Complex sections without tablet \(1024px\/lg\) breakpoint coverage/);
+    const result = run(dir, true);
+    assert.equal(result.status, 0);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.filesScanned, 1);
+    assert.equal(report.blockers, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("allows complex grids with explicit lg tablet breakpoint coverage", () => {
-  const dir = fixture({
-    "DESIGN.md": "Palette\n- Surface #ffffff\nMotion\nMOTION_INTENSITY: 3\nEntrance 280ms\nStagger 70ms\n",
-    "src/App.tsx": "export default function App(){return <section className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6\"><h1 className=\"text-sm text-base text-lg text-xl\">Test</h1></section>}",
-  });
-  try {
-    const result = run(dir);
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /tablet=true/);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
 let failed = 0;
 for (const { name, fn } of cases) {
   try {
@@ -112,4 +94,4 @@ for (const { name, fn } of cases) {
 }
 
 if (failed > 0) process.exit(1);
-console.log(`\n${cases.length} layout analyzer tests passed`);
+console.log(`\n${cases.length} layout tests passed`);

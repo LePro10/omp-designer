@@ -1,244 +1,158 @@
-# AGENTS.md — AI Onboarding for omp-designer
+# AGENTS.md — omp-designer v5
 
-> **If you're an AI agent and someone shared this repo with you:** follow this file exactly.
-> It contains the complete install → configure → verify workflow.
-> Ask the user for missing information. Never guess API keys.
+Follow this file when installing, changing, or evaluating the package.
 
----
+## Purpose
 
-## What this is
+`omp-designer` is a toggleable `/designer` workflow for Pi and oh-my-pi. Version
+5 uses four conditional design skills and deterministic delivery checks. MCP
+servers are optional and are never toggled by the extension.
 
-`omp-designer` is a toggleable `/designer` extension for [Pi](https://pi.dev) and [oh-my-pi](https://github.com/can1357/oh-my-pi) that loads
-12 design skills + 4 MCP integrations. It turns any coding agent into a UI/UX design
-specialist with anti-AI-slop enforcement, EVIDENCE.md truth tracking, and deterministic validators.
+## Prerequisites
 
-## Step 0: Check prerequisites
+- Node.js 20.19 or newer
+- Pi or omp
+- `npm` and `npx`
+- a configured model provider
 
-Before installing, verify the user's agent has the tools the designer workflow needs.
+Pi's basic read/write/edit/bash tools are sufficient for core work. Browser,
+image-generation, and subagent extensions can help particular tasks, but must not
+be presented as installation requirements.
 
-### Pi users (pi.dev)
+## Install
 
-Pi ships with only `read`, `write`, `edit`, `bash` by default. The designer workflow uses these additional tools:
-
-| Tool | Used for | Status |
-|------|----------|--------|
-| `search_tool_bm25` | MCP tool discovery | ✅ Built-in |
-| `web_search` | Looking up design references, motion.dev examples | ❌ Needs extension |
-| `generate_image` | Hero images, visual assets | ❌ Needs extension |
-| `task` / subagents | Parallel component building | ❌ Needs extension |
-| `resolve` | Plan approval in one turn | ❌ omp-only, fallback to manual approval |
-| `local://` URIs | Plan file persistence | ❌ omp-only, fallback to `write` |
-
-**If the user is on Pi, ASK:** "Pi only has 4 built-in tools. The designer workflow works best with web_search, task/subagents, and generate_image. Should I install community extensions for these?"
-
-Recommended Pi extensions:
-- Subagents: `pi install git:github.com/tintinweb/pi-subagents`
-- Web search: `pi install npm:@anthropic/pi-web-search` (or check pi.dev/packages)
-- Image generation: check pi.dev/packages for a `generate_image` extension
-
-**If the user says no, that's fine.** The core designer workflow (palette selection, code generation, review) still works without them. The skills have built-in fallbacks for missing tools.
-
-### omp users (oh-my-pi)
-
-omp ships with 15+ tools including `web_search`, `generate_image`, `task`, `resolve`, `local://`. No extra setup needed beyond MCP configuration.
-
-## Step 1: Install
-
-Pi or omp must be installed first.
+Use exactly one installation mechanism:
 
 ```bash
-# For Pi (pi.dev):
 pi install npm:omp-designer
-
-# For oh-my-pi (omp):
+# or
 omp install npm:omp-designer
 ```
 
-If the user doesn't have Pi or omp installed:
-- Pi: `curl -fsSL https://pi.dev/install.sh | sh`
-- omp: follow https://github.com/can1357/oh-my-pi
+Never combine a plugin install with a manually copied extension. If upgrading
+from v4, use the lifecycle cleanup, install v5 once, fully restart the agent, and
+run `/designer-doctor`.
 
-Verify: ask the user to type `/designer` in their agent. They should see "DESIGNER MODE ON".
+Published install:
 
-## Step 2: Configure MCP servers
-
-This package uses 4 MCP servers. Two are free, two need API keys.
-
-### ASK THE USER these questions (one at a time):
-
-**Question 1:** "Do you have a 21st.dev API key? Get a free one at https://21st.dev/studio — it enables SVG logo search and component patterns."
-
-If YES → add to `~/.pi/agent/mcp.json` or `~/.omp/agent/mcp.json`:
-```json
-"21st-dev-magic": {
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "@21st-dev/magic@latest"],
-  "env": { "API_KEY": "<their-key>" },
-  "enabled": false
-}
+```bash
+npx --yes omp-designer@latest uninstall --apply
+omp install npm:omp-designer@latest
 ```
 
-If NO → skip. 21st-dev is optional. The agent will use ui-layouts + hand-crafted components instead.
+Local checkout:
 
-**Question 2:** "Do you have a designmd API key? Get one at https://designmd.ai/api-keys — it provides design system references."
-
-If YES → add:
-```json
-"designmd": {
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "designmd-mcp@latest"],
-  "env": { "DESIGNMD_API_KEY": "<their-key>" },
-  "enabled": false
-}
+```bash
+cd /path/to/omp-designer
+npm run system:inspect
+npm run install:local:clean
 ```
 
-If NO → skip. designmd is entirely optional.
+`npm run` lifecycle commands require the checkout as the current directory. From
+any directory, invoke the installed package directly:
 
-**No questions needed for these (auto-configure):**
-
-```json
-"chrome-devtools": {
-  "type": "stdio",
-  "command": "npx",
-  "args": [
-    "-y", "chrome-devtools-mcp@latest",
-    "--isolated", "--headless",
-    "--no-usage-statistics", "--no-performance-crux",
-    "--chrome-arg=--no-sandbox",
-    "--chrome-arg=--disable-gpu",
-    "--chrome-arg=--disable-dev-shm-usage",
-    "--chrome-arg=--disable-logging",
-    "--chrome-arg=--log-level=3"
-  ],
-  "env": {
-    "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1",
-    "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"
-  },
-  "enabled": false
-},
-"ui-layouts": {
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "@ui-layouts/mcp@latest"],
-  "enabled": false
-}
+```bash
+node "$HOME/.omp/plugins/node_modules/omp-designer/scripts/lifecycle-cli.mjs" uninstall --apply
 ```
 
-> **IMPORTANT:** Find the Chrome binary path. On Linux check `~/.cache/puppeteer/chrome/` or run `which google-chrome`. On macOS it's `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`. Add `"--executable-path"` to chrome-devtools args if not auto-detected.
+Lifecycle commands are dry-run by default. `install:local:clean` is the explicit
+exception: it cleans known v2 files, runs package checks, and links the current
+checkout. Its internal `--keep-data` preserves comparison traces. A direct
+`uninstall --apply` removes all package-owned OMP data by default. Neither path
+edits MCP configuration, general sessions, or unrelated memory.
 
-> **Chrome log spam:** The `--disable-logging --log-level=3` args suppress harmless Chrome internal errors (`fallback_task_provider.cc`, `extension_web_request_event_router.cc`).
+Verify:
 
-## Step 3: Recommend model
+1. `/designer` reports `DESIGNER MODE ON`.
+2. `/designer` again reports `DESIGNER MODE OFF`.
+3. `/designer-doctor` shows four present skills and no duplicate-load risk.
 
-Tell the user: "For best design results, use MiniMax M3. It has the best design taste and follows anti-slop rules most consistently."
+## Optional MCP configuration
 
-Pi (`~/.pi/agent/config.yml`):
-```yaml
-modelRoles:
-  default: minimax/MiniMax-M3:high
+Ask before configuring a service that requires a key. Never guess or expose a
+key.
+
+- `21st-dev-magic`: optional component/SVG search; requires `API_KEY`
+- `designmd`: optional design-system reference; requires `DESIGNMD_API_KEY`
+- `chrome-devtools`: optional browser inspection
+- `ui-layouts`: optional layout references
+
+The extension does not edit `~/.pi/agent/mcp.json` or
+`~/.omp/agent/mcp.json`. Configuration belongs to the user. Prefer pinned package
+versions in persistent configuration. An unavailable MCP must degrade to local
+inspection rather than block the workflow.
+
+## Runtime contract
+
+- State is per working directory.
+- `OMP_DESIGNER_MODE=1` or `0` overrides persisted state for automation.
+- Skills and data are read from the installed package.
+- No tool is blocked until a skill is read.
+- Small edits stay small; artifacts are reserved for new pages and major
+  redesigns.
+- Product claims require user or source evidence.
+- Warnings require judgment; only objective blockers prevent delivery.
+- Delivery continuation is bounded and must never form an autonomous loop.
+
+## Required checks for package changes
+
+```bash
+npm test
+npm run check:release
 ```
 
-omp (`~/.omp/agent/config.yml`):
-```yaml
-modelRoles:
-  default: minimax/MiniMax-M3:high
+For changes that can affect generated output, also run a real-agent comparison:
+
+```bash
+node scripts/real-agent-eval.mjs \
+  --run <new-run> \
+  --case saas \
+  --baseline test-output/<previous-run> \
+  --model opencode-go/deepseek-v4-flash:xhigh
 ```
 
-If the user prefers another model, that's fine — but warn them that small/fast models will produce more generic designs.
+Keep generated projects and reports under `test-output/`. Inspect at least one
+desktop and one mobile screenshot. The automated score covers delivery evidence,
+not visual quality; record visual findings separately.
 
-## Step 4: Verify installation
+Before a real-agent comparison, ensure `/designer-doctor` reports one package
+source, four skills, and no legacy duplicate risk. A full host restart is
+required after switching between local and published installations. Do not use a
+mixed installation as release evidence.
 
-After setup, ask the user to:
+## Repository rules
 
-1. Start Pi/omp
-2. Type `/designer` → should see "DESIGNER MODE ON"
-3. Type `/designer` again → should see "DESIGNER MODE OFF"
-4. Type `/reload` (Pi) or restart (omp) to activate MCP servers
-5. Optional: type `/designer-doctor` → should show source/install/skill/MCP/trace health
+- Never read entire CSV datasets when a targeted search and range read is enough.
+- Never place API keys, npm tokens, auth headers, or `.env` values in chat, CLI
+  arguments, traces, fixtures, or commits.
+- Never publish before `npm run check:release`.
+- Do not hardcode a user's home directory.
+- Preserve unrelated work in a dirty tree.
+- Update skills only when model-backed evidence points to a workflow problem.
+- Compare the same prompt/case before and after a change.
+- Never install a published copy over a local link; uninstall the old source
+  first.
 
-## What NOT to do
+## Structure
 
-- NEVER guess API keys or tokens
-- NEVER paste npm tokens, API keys, auth headers, or `.env` values into chat or CLI arguments
-- NEVER publish without running `npm run check:release`
-- NEVER hardcode the user's home directory paths — use `~` or ask
-- NEVER skip the MCP configuration step
-- NEVER modify the skill files in `skills/`
-- NEVER read full CSV files from `data/ui-ux-pro-max/` — use grep + range reads
-
-## Package structure (for reference)
-
-```
-omp-designer/
-├── extensions/designer.ts    # Pi extension (pi.dev API)
-├── extension/index.ts        # omp extension (prompt, MCP toggling, trace, doctor)
-├── skills/                   # 12 auto-discovered design skills
-│   ├── ai-slop.md            # Canonical anti-slop reference
-│   ├── designer-master.md    # 8-step orchestration workflow
-│   ├── product-md.md         # PRODUCT.md + EVIDENCE.md workflow
-│   ├── design-md.md          # Design system spec
-│   ├── taste-skill.md        # Anti-slop rules + pre-flight
-│   ├── ui-ux-pro-max.md      # CSV design intelligence instructions
-│   ├── copywriting.md        # Human copy rules
-│   ├── animate.md            # Animation patterns and easing
-│   ├── scroll-choreography.md # Narrative scroll patterns
-│   ├── reference-study.md    # Reference study protocol
-│   ├── visual-critique.md    # Screenshot and mobile QA
-│   └── review-skill.md       # Post-build audit
-├── data/ui-ux-pro-max/       # 1.7 MB CSV design database
-│   ├── colors.csv            # 161 color palettes
-│   ├── typography.csv        # 57 font pairings
-│   └── ...                   # styles, UX guidelines, framework stacks
-├── scripts/
-│   ├── fix-ai-slop.mjs       # Read-only lint by default; --fix mutates
-│   ├── analyze-layout.mjs    # Layout, palette, and motion validator
-│   ├── check-release.mjs     # Version + secret hygiene release gate
-│   ├── eval-suite.mjs        # Golden prompt corpus validator/scorer
-│   └── audit-trace.mjs       # JSONL run trace auditor
-├── eval/                      # Golden prompt corpus + fixtures
-├── docs/                     # Architecture, MCP setup, problems
-├── README.md                 # Human-readable install guide
-└── package.json              # Dual manifest (pi + omp)
+```text
+extension/index.ts               omp runtime
+extensions/designer.ts           Pi runtime
+skills/                          four conditional skills
+data/ui-ux-pro-max/              palette/typography reference data
+scripts/__tests__/               runtime and validator regression tests
+scripts/install-local.mjs        local checkout linker
+scripts/uninstall-system.mjs     plugin and known-v2 cleanup
+scripts/real-agent-eval.mjs      DeepSeek/omp comparison harness
+test-output/                     generated projects and reports, ignored by npm
 ```
 
 ## Troubleshooting
 
-**MCP servers not connecting?**
-- Run `/reload` (Pi) or restart omp
-- Check that `npx` is available: `which npx`
-- Check API keys in mcp.json are correct
-
-**Source or installed copy may be stale?**
-- Run `/designer-doctor`
-- Check installed extension hash, script presence, managed skill count, MCP status, and trace path
-
-**Agent says done but may have skipped validation?**
-- In omp designer mode, `session_stop` automatically runs `fix-ai-slop --check` and `analyze-layout` for generated projects
-- Check `/designer-doctor` trace path for `auto_validation_started` and `auto_validation_passed`
-
-**Chrome errors in log?**
-- Add `--chrome-arg=--disable-logging --chrome-arg=--log-level=3` to chrome-devtools args
-- These are harmless Chromium internal messages, not from the designer package
-
-**Designer mode ON but still getting AI-slop?**
-- Check the model: small/fast models ignore design rules. Switch to MiniMax M3 or Claude Opus.
-- Check that skills are loaded: run `/reload` and look for skill names in startup output
-- Verify the system prompt injection is working — look for "[DESIGNER MODE: ACTIVE]" in context
-
-**Missing tools on Pi (resolve, local://, generate_image)?**
-- `resolve`: agent will fall back to asking the user via chat. Slower but works.
-- `local://`: agent will fall back to writing plan files with `write` tool. Same result.
-- `generate_image`: agent will use logo_search (21st-dev) for SVGs, placeholder descriptions for photos.
-- `task`/subagents: agent will build components sequentially instead of in parallel. Slower, same quality.
-- `web_search`: agent will use known URLs and MCP tools instead of web search. No external lookups needed.
-
-## Key URLs
-
-- GitHub: https://github.com/LePro10/omp-designer
-- npm: https://www.npmjs.com/package/omp-designer
-- Pi docs: https://github.com/earendil-works/pi
-- omp docs: https://github.com/can1357/oh-my-pi
-- 21st.dev API keys: https://21st.dev/studio (free tier)
-- designmd API keys: https://designmd.ai/api-keys (optional)
+- Duplicate prompt events: run `/designer-doctor`; remove the second install path.
+- MCP unavailable: verify it independently, then continue without it if optional.
+- Mode enabled but no prompt: restart/reload and check the current working
+  directory and state override.
+- Validator warning: inspect the actual usage; do not churn code just to reach
+  zero warnings.
+- Agent claims QA: require build output and named screenshots from the run.

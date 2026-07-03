@@ -4,7 +4,7 @@
     "21st-dev-magic": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@21st-dev/magic@latest"],
+      "args": ["-y", "@21st-dev/magic@0.1.0"],
       "env": {
         "API_KEY": "<YOUR_21ST_DEV_API_KEY>"
       },
@@ -13,7 +13,7 @@
     "designmd": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "designmd-mcp@latest"],
+      "args": ["-y", "designmd-mcp@0.2.1"],
       "env": {
         "DESIGNMD_API_KEY": "<YOUR_DESIGNMD_API_KEY>"
       },
@@ -22,18 +22,17 @@
     "ui-layouts": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@ui-layouts/mcp@latest"],
+      "args": ["-y", "@ui-layouts/mcp@0.3.0"],
       "enabled": false
     },
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
       "args": [
-        "-y", "chrome-devtools-mcp@latest",
-        "--isolated", "--headless",
+        "-y", "chrome-devtools-mcp@1.4.0",
+        "--isolated", "--headless", "--slim",
         "--no-usage-statistics", "--no-performance-crux",
         "--chrome-arg=--no-sandbox",
-        "--chrome-arg=--disable-gpu",
         "--chrome-arg=--disable-dev-shm-usage",
         "--chrome-arg=--disable-logging",
         "--chrome-arg=--log-level=3"
