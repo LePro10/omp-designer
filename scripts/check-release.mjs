@@ -1,89 +1,87 @@
 #!/usr/bin/env node
 /**
- * check-release.mjs - release consistency and secret hygiene gate.
- *
- * Fails before npm publish if package/docs disagree on version or if package
- * files contain likely auth tokens. Keep this read-only and deterministic.
+ * Release package integrity and secret-hygiene gate.
  */
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { join, extname } from "node:path";
+
+import { existsSync, readFileSync } from "node:fs";
+import { extname, join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { findSecrets } from "./security.mjs";
 
 const root = process.cwd();
-const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
-const version = String(pkg.version);
-const majorMinor = version.split(".").slice(0, 2).join(".");
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const failures = [];
-
-function read(path) {
-  return readFileSync(join(root, path), "utf-8");
-}
-
-function requireIncludes(path, text, label) {
-  const content = read(path);
-  if (!content.includes(text)) failures.push(`${label}: ${path} must include ${text}`);
-}
-
-function walk(dir) {
-  const files = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      if (["node_modules", "dist", ".git", "test-output", "pi-backup (old)", ".next", "coverage", "__tests__"].includes(entry)) continue;
-      files.push(...walk(full));
-    } else {
-      files.push(full);
-    }
-  }
-  return files;
-}
-
-const secretPatterns = [
-  { label: "npm token", regex: /npm_[A-Za-z0-9]{20,}/g },
-  { label: "OpenAI key", regex: /sk-[A-Za-z0-9_-]{20,}/g },
-  { label: "GitHub token", regex: /gh[pousr]_[A-Za-z0-9_]{20,}/g },
-  { label: "Anthropic key", regex: /sk-ant-[A-Za-z0-9_-]{20,}/g },
-  { label: "AWS access key", regex: /AKIA[0-9A-Z]{16}/g },
-  { label: "Private key block", regex: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----/g },
-  { label: "JWT", regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
-  { label: "Bearer token", regex: /Bearer\s+[A-Za-z0-9_.\-+/=]{20,}/g },
-  { label: "Database URI with credentials", regex: /(?:postgres|mysql|mongodb|redis):\/\/[^:]+:[^@]+@/g },
-  { label: "Long hex API key in env field", regex: /["'](?:API_KEY|TOKEN|SECRET|PASSWORD|api_key|token|secret|password)["']\s*[:=]\s*["'][0-9a-fA-F]{32,}["']/g },
+const expectedSkills = ["animate.md", "design-md.md", "designer-master.md", "review-skill.md"];
+const requiredFiles = [
+  "extension/index.ts",
+  "extensions/designer.ts",
+  "scripts/fix-ai-slop.mjs",
+  "scripts/analyze-layout.mjs",
+  "scripts/audit-data.mjs",
+  "scripts/real-agent-eval.mjs",
+  "scripts/install-local.mjs",
+  "scripts/lifecycle-cli.mjs",
+  "scripts/lifecycle-lib.mjs",
+  "scripts/uninstall-system.mjs",
+  "docs/install-lifecycle.md",
+  "data/ui-ux-pro-max/colors.csv",
+  "data/ui-ux-pro-max/typography.csv",
+  ...expectedSkills.map((name) => `skills/${name}`),
 ];
 
-const textExtensions = new Set([".md", ".ts", ".tsx", ".js", ".mjs", ".json", ".yml", ".yaml", ".txt", ".csv"]);
+if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) failures.push(`Invalid semver: ${pkg.version}`);
+if (!String(pkg.description).includes("4 conditional skills")) {
+  failures.push("package description must state the 4-skill architecture");
+}
+if (pkg.bin?.["omp-designer"] !== "./scripts/lifecycle-cli.mjs") {
+  failures.push("package bin must expose scripts/lifecycle-cli.mjs as omp-designer");
+}
 
-function scanSecrets() {
-  for (const file of walk(root)) {
-    if (!textExtensions.has(extname(file))) continue;
-    const content = readFileSync(file, "utf-8");
-    for (const { label, regex } of secretPatterns) {
-      for (const match of content.matchAll(regex)) {
-        const rel = file.slice(root.length + 1);
-        const line = content.slice(0, match.index ?? 0).split("\n").length;
-        failures.push(`${label}: ${rel}:${line} contains a likely secret`);
-      }
-    }
+for (const file of requiredFiles) {
+  if (!existsSync(join(root, file))) failures.push(`Missing release file: ${file}`);
+}
+
+const packed = spawnSync("npm", ["pack", "--dry-run", "--ignore-scripts", "--json"], {
+  cwd: root,
+  encoding: "utf8",
+  timeout: 60_000,
+  maxBuffer: 4 * 1024 * 1024,
+});
+
+let packedFiles = [];
+if (packed.status !== 0) {
+  failures.push(`npm pack --dry-run failed: ${packed.stderr || packed.stdout}`);
+} else {
+  try {
+    packedFiles = JSON.parse(packed.stdout)[0].files.map((entry) => entry.path);
+  } catch (error) {
+    failures.push(`Could not parse npm pack output: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-if (!/^\d+\.\d+\.\d+$/.test(version)) failures.push(`package.json version must be semver, got ${version}`);
-if (pkg.description?.includes("9 skills")) failures.push("package.json description still says 9 skills");
+for (const file of requiredFiles) {
+  if (packedFiles.length > 0 && !packedFiles.includes(file)) failures.push(`Release tarball omits ${file}`);
+}
 
-requireIncludes("README.md", `v${majorMinor}`, "README version");
-requireIncludes("docs/problems.md", `v${majorMinor}`, "problems.md version");
-requireIncludes("AGENTS.md", "12 design skills", "AGENTS skill count");
+for (const file of packedFiles) {
+  if (file.includes("/__tests__/")) failures.push(`Release tarball should not contain tests: ${file}`);
+  if (!new Set([".md", ".ts", ".js", ".mjs", ".json", ".yml", ".yaml", ".csv"]).has(extname(file))) continue;
+  const content = readFileSync(join(root, file), "utf8");
+  for (const finding of findSecrets(content)) {
+    const line = content.slice(0, finding.index).split("\n").length;
+    failures.push(`${finding.label}: ${file}:${line}`);
+  }
+}
 
-if (!existsSync(join(root, "skills", "ai-slop.md"))) failures.push("skills/ai-slop.md missing");
-if (!existsSync(join(root, "scripts", "fix-ai-slop.mjs"))) failures.push("scripts/fix-ai-slop.mjs missing");
-if (!existsSync(join(root, "scripts", "analyze-layout.mjs"))) failures.push("scripts/analyze-layout.mjs missing");
-
-scanSecrets();
+const extension = readFileSync(join(root, "extension", "index.ts"), "utf8");
+if (/setDesignerMcpEnabled|DESIGNER_SKILL_GATE_BLOCKED|Attempt ALL/.test(extension)) {
+  failures.push("Legacy MCP mutation or skill-gate code remains in extension/index.ts");
+}
 
 if (failures.length > 0) {
-  console.error("Release check failed:\n");
+  console.error("Release check failed:");
   for (const failure of failures) console.error(`  - ${failure}`);
   process.exit(1);
 }
 
-console.log(`Release check passed for omp-designer@${version}`);
+console.log(`Release check passed for omp-designer@${pkg.version} (${packedFiles.length} packed files)`);

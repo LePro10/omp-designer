@@ -1,218 +1,213 @@
-# omp-designer — Autonomous AI Design System (v4.1)
+# omp-designer v5
 
-A `/designer` extension for oh-my-pi that turns your AI coding agent into a UI/UX design specialist.
+Focused UI/UX workflow for [Pi](https://pi.dev) and
+[oh-my-pi](https://github.com/can1357/oh-my-pi).
+
+Version 5 removes the mandatory 12-skill gate and MCP state mutation. It provides
+four conditional skills, a concise system prompt, evidence-aware validators, and
+a reproducible real-agent comparison harness.
+
+## Install
+
+Install with exactly one mechanism:
 
 ```bash
+# Pi
+pi install npm:omp-designer
+
+# oh-my-pi
 omp install npm:omp-designer
 ```
 
-Then `/designer` → DESIGNER MODE ON.
+Do not also copy the extension into an agent extension directory. Duplicate
+install paths can register hooks twice. Run `/designer-doctor` if an older manual
+copy may still exist.
 
----
+### Published package
 
-## How it works
-
-```
-User: "build me a website about AI"
-         │
-         ▼
-┌─────────────────────────────────────────────┐
-│  STEP 1: INTERACTION MODE                    │
-│  Guided / Adaptive / Autonomous / Batch      │
-│  Batch never waits; Autonomous asks 1 emotion│
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 2: PRODUCT.md + EVIDENCE.md            │
-│  Write brief + claim tracking before design  │
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 3: PLAN (MANDATORY)                    │
-│  7-section plan with MCP research log        │
-│  Approval behavior follows selected mode     │
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 4: MCP RESEARCH                        │
-│  designmd, ui-layouts, 21st-dev, browser     │
-│  Fallback: web_search if MCPs unavailable    │
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 5: DESIGN TOKENS                       │
-│  CSV palette default; user brand wins        │
-│  Typography from typography.csv              │
-│  DESIGN.md written before any component      │
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 6: BUILD                               │
-│  Components following approved plan          │
-│  generate_image for hero visuals             │
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 7: POST-BUILD SELF-CHECK (MANDATORY)   │
-│  fix-ai-slop.mjs + analyze-layout.mjs        │
-│  npm run build + impeccable detect            │
-│  Section viewport screenshots                │
-└─────────────────┬───────────────────────────┘
-                  ▼
-┌─────────────────────────────────────────────┐
-│  STEP 8: ANTI-SLOP VERIFICATION              │
-│  Substitution test + rationale test          │
-│  Anti-overcorrection check                   │
-│  Shipping readiness vs slop risk             │
-└─────────────────────────────────────────────┘
-```
-
-### Interaction modes
-
-| Mode | Trigger | Questions | Approval |
-|------|---------|-----------|----------|
-| Guided | User asks to be asked or wants a guided process | 3-5 multiple-choice | Wait after plan |
-| Adaptive | Normal brief with a few missing facts | Only decision-critical | Wait after plan |
-| Autonomous | "surprise me", "impress me", "i trust you" | One emotion question | Continue after plan unless user asks for approval |
-| Batch | `omp -p`, "do not wait", "build it now", "no approval" | None; document assumptions | No wait |
-
----
-
-## The 12 Skills
-
-| Skill | When Agent Reads It | What It Contains |
-|-------|-------------------|------------------|
-| **designer-master** | First (workflow contract) | 8-step workflow, palette table, plan template |
-| **ai-slop** | During planning | Canonical anti-slop definition, substitution test, rationale test, 14 evaluation dimensions |
-| **product-md** | Before design work | PRODUCT.md format, EVIDENCE.md template, "never invent facts" |
-| **taste-skill** | During planning + after building | Brief inference, dials, AI tells checklist, pre-flight check |
-| **design-md** | Before building | DESIGN.md format, Tailwind v4 notes, motion notes |
-| **ui-ux-pro-max** | During planning | How to pick from CSV data files (161 palettes, 57 font pairings) |
-| **reference-study** | During planning | How to study real websites before designing |
-| **copywriting** | Before building | Human copy rules, banned words, validation checkpoint |
-| **scroll-choreography** | Before building | Narrative motion patterns, mobile fallbacks |
-| **animate** | During building | Animation patterns, easing, timing |
-| **visual-critique** | After building | Screenshot evaluation, mobile QA, reveal-trigger protocol |
-| **review-skill** | After building | Post-build audit, dimension-based evaluation, anti-overcorrection |
-
----
-
-## MCP Servers
-
-| Server | What It Provides | When Used |
-|--------|-----------------|-----------|
-| **21st-dev-magic** | Component inspiration, SVG logos | During planning |
-| **ui-layouts** | 60+ real React/TSX components | During planning + building |
-| **chrome-devtools** | Headless browser screenshots | During planning + review |
-| **designmd** | Design system references | During planning |
-
----
-
-## Anti-Slop System
-
-### Canonical reference
-- **ai-slop.md** (679 lines) — the single source of truth for what constitutes AI slop
-
-### Deterministic validators
-- **fix-ai-slop.mjs** — read-only by default (`--check`); catches em-dashes, buzzwords, fake numbers, stock photos, unsupported EVIDENCE.md claims, overused fonts, commerce claims. Use `--fix` only for deterministic em-dash cleanup.
-- **analyze-layout.mjs** — read-only; catches off-palette source colors, motion timing issues, missing tablet breakpoint coverage for complex layouts, layout problems, CSV palette validation, and allows user-provided brand colors/documented derivations.
-- **Automatic session-stop gate** — in omp, designer mode runs both validators automatically before the final assistant response when the current directory looks like a generated project. Blocking issues force an internal continuation instead of shipping.
-
-### Evaluation framework
-- **14 dimensions** scored 0-4 (product grounding, truthfulness, specificity, narrative, composition, system coherence, copy, imagery, motion, accessibility, responsiveness, functional completeness, distinctiveness)
-- **Shipping readiness** — pass/fail on blocking defects
-- **Slop risk** — weighted score from 0-100
-
-### Observability
-- **Run trace** — when designer mode is enabled, the omp extension writes JSONL events to `~/.omp/agent/designer-traces/<cwd-hash>.jsonl`.
-- **Traced events** — prompt injection, skill discovery, agent start/end, tool calls/results, automatic validation start/pass/fail, validator/build command kinds.
-- **Phase tracking** — the extension tracks workflow phase (`idle → planning → building → reviewing → validated`) based on tool call patterns. Phase is stored in `~/.omp/agent/designer-phases/<cwd-hash>.json` and reported by `/designer-doctor`. Session-stop validation failures include the current phase.
-- **Doctor command** — `/designer-doctor` writes source/install/skill/MCP/trace/phase health into the editor.
-
-### Regression suite
-- **Golden corpus** — `eval/prompts.jsonl` contains 20 fixed prompts across landing pages, e-commerce, redesign/edit, dashboards, forms, content, checkout, multi-page, mobile, reduced motion, and adversarial asks.
-- **Eval harness** — `node scripts/eval-suite.mjs validate` checks corpus coverage; `commands` prints reproducible `omp -p` runs; `score <output-root>` runs deterministic validators over generated outputs.
-- **Trace audit** — `node scripts/audit-trace.mjs <trace.jsonl> --strict` verifies prompt injection, skill discovery, automatic validation, explicit validator calls, and build calls.
-- **30 regression tests** — `npm run test:validators` (11), `npm run test:layout` (5), `npm run test:trace` (3), `npm run test:prompt` (8), `npm run test:eval` (corpus).
-
----
-
-## Files
-
-```
-omp-designer/
-├── extension/index.ts           # omp extension (PROMPT_INJECT, MCP toggling, trace, doctor)
-├── extensions/designer.ts       # Pi extension
-├── skills/                      # 12 design skills
-│   ├── ai-slop.md               # Canonical anti-slop reference (NEW)
-│   ├── designer-master.md       # Workflow contract
-│   ├── taste-skill.md           # Anti-slop rules + AI tells
-│   ├── product-md.md            # Brief capture + EVIDENCE.md
-│   ├── design-md.md             # DESIGN.md format
-│   ├── ui-ux-pro-max.md         # CSV data usage
-│   ├── reference-study.md       # Reference study guide
-│   ├── copywriting.md           # Human copy rules
-│   ├── scroll-choreography.md   # Motion patterns
-│   ├── animate.md               # Animation patterns
-│   ├── visual-critique.md       # Screenshot evaluation
-│   └── review-skill.md          # Post-build audit
-├── data/
-│   ├── ui-ux-pro-max/           # 1.7MB design database (CSVs)
-│   └── scroll-templates.tsx     # Reusable scroll patterns
-├── scripts/
-│   ├── fix-ai-slop.mjs          # Read-only anti-slop validator; --fix mutates
-│   ├── analyze-layout.mjs       # Layout + palette + motion validator
-│   ├── check-release.mjs        # Version + secret hygiene release gate
-│   ├── eval-suite.mjs           # Golden prompt corpus validator/scorer
-│   └── audit-trace.mjs          # JSONL run trace auditor
-├── eval/
-│   ├── prompts.jsonl            # 20-prompt regression corpus
-│   └── fixtures/                # Existing-app fixtures for redesign/edit tests
-├── test-output/                 # Test projects
-├── docs/problems.md             # Known issues + fixes
-└── loop.md                      # Improvement loop
-```
-
----
-
-## Quickstart
+For a normal published installation:
 
 ```bash
-omp install npm:omp-designer
-omp
-/designer                        # DESIGNER MODE ON
-/designer-doctor                 # Optional: verify install, skills, MCPs, trace path
-/designer-reset                  # Reset skill gate after ordering violation
-"Build me a SaaS landing page"   # Agent asks questions first
-# Answer the questions
-# Agent shows plan with MCP research log
-# Type "accept"
-# Agent builds
-# Agent runs fix-ai-slop --check + analyze-layout
-# Agent takes section screenshots
-# Agent reports substitution test + rationale test
+# Inspect only; this changes nothing
+npx --yes omp-designer@latest uninstall
+
+# Remove an existing plugin plus known v2 leftovers
+npx --yes omp-designer@latest uninstall --apply
+
+# Install one fresh published copy
+omp install npm:omp-designer@latest
 ```
 
-### Platform support
+Fully restart omp after changing the installation. Then run
+`/designer-doctor`. A normal uninstall removes plugin registration, known legacy
+copies, state, traces, and obsolete gate/phase data. MCP configuration,
+credentials, general OMP sessions, and unrelated agent memory are never changed.
 
-| Feature | OMP (oh-my-pi) | Pi (pi.dev) |
-|---------|---------------|-------------|
-| Pre-execution tool blocking | Yes | No (prompt-only) |
-| Skill read tracking | Yes | No |
-| Session-stop validation | Yes | No |
-| Trace logging | Yes | No |
-| Doctor command | Yes | No |
+### Local checkout before publishing
 
-**For guaranteed skill-reading enforcement, use OMP.** Pi relies on model compliance with prompt instructions.
+Use a plugin link when testing this checkout:
 
----
+```bash
+cd /path/to/omp-designer
+npm run system:inspect
+npm run install:local:clean
+```
 
-## Best Model
+`install:local:clean` removes the current `omp-designer` registration and the
+known v2 manual extension/managed-skill copies, runs `npm test` and
+`npm run check:release`, then links this checkout with `omp plugin link`. It
+uses the explicit `--keep-data` path so comparison traces survive. Restart omp
+and run `/designer-doctor` before a real-agent comparison.
 
-MiniMax M3 (`opencode-go/minimax-m3:high`) — best design taste. DeepSeek V4 Flash also good for testing.
+Dry-run and explicit variants:
 
----
+```bash
+# Run these inside the repository
+npm run install:local          # preview only
+npm run install:local:apply    # link only; refuses a legacy mix
+npm run uninstall:system       # preview only
+npm run uninstall:system:apply # remove all package-owned OMP data
+```
 
-## License
+From any directory, address the currently installed OMP package directly:
 
-MIT.
+```bash
+# Preview
+node "$HOME/.omp/plugins/node_modules/omp-designer/scripts/lifecycle-cli.mjs" uninstall
+
+# Apply full uninstall
+node "$HOME/.omp/plugins/node_modules/omp-designer/scripts/lifecycle-cli.mjs" uninstall --apply
+```
+
+Do not install the npm package over a local link. Uninstall the local copy first,
+then install the published package. See
+[docs/install-lifecycle.md](docs/install-lifecycle.md) for the full transition
+matrix and retained-data policy.
+
+Toggle the workflow:
+
+```text
+/designer
+```
+
+The mode is stored per project. `OMP_DESIGNER_MODE=1` and
+`OMP_DESIGNER_MODE=0` provide explicit overrides for automation.
+
+## What v5 loads
+
+- `designer-master`: proportional product-design workflow
+- `design-md`: visual-system contract for new pages and redesigns
+- `animate`: optional motion guidance
+- `review-skill`: delivery and browser review
+
+Skills remain package-relative. There is no managed-skill copy and no requirement
+to read every skill before using tools.
+
+## MCP policy
+
+MCP servers are optional references, not workflow gates. The extension observes
+their configuration in `/designer-doctor` but never edits `mcp.json` and never
+enables or disables a server.
+
+Useful optional servers:
+
+- `chrome-devtools`: browser inspection when the built-in browser is insufficient
+- `ui-layouts`: relevant layout/component references
+- `21st-dev-magic`: component or SVG search; API key required
+- `designmd`: external design-system references; API key required
+
+Configure only the servers a team actually uses. Pin versions in shared or
+production configuration.
+
+## Validation
+
+```bash
+npm test
+npm run check:release
+```
+
+The quality validator blocks unsupported visible claims and commerce promises.
+Stylistic signals such as a single em dash are warnings. The layout validator
+checks documented colors and objective contrast failures without requiring a
+full design document for a small edit.
+
+During omp delivery checks, claim support comes from the original user prompt
+held in extension memory. Agent-generated PRODUCT.md or EVIDENCE.md cannot
+self-authorize a fact. Standalone CLI use falls back to those ledgers unless
+`DESIGNER_USER_FACTS` is supplied.
+
+Run validators against another project:
+
+```bash
+node scripts/fix-ai-slop.mjs --check /path/to/project
+node scripts/analyze-layout.mjs /path/to/project
+```
+
+## Real-agent comparison
+
+Generated projects and reports are kept under `test-output/`:
+
+```bash
+node scripts/real-agent-eval.mjs \
+  --run fieldnote-r1 \
+  --case saas \
+  --baseline test-output/previous-run \
+  --model opencode-go/deepseek-v4-flash:xhigh
+```
+
+The harness runs the real `omp` agent, builds the result, runs both validators,
+counts named screenshots, records composition warning signals, and emits a JSON
+comparison in `test-output/reports/`. A run is invalid unless its isolated trace
+proves prompt injection, a delivery outcome, and no adjacent duplicate hook event.
+Generation refuses to start unless OMP reports this checkout as the sole clean
+v5 plugin source. The harness does not add a second explicit extension path.
+
+Its numeric score measures delivery evidence, not visual taste. Screenshots must
+still be reviewed. A valid iteration is:
+
+1. establish one clean install source and restart omp,
+2. run the same case against a baseline,
+3. inspect desktop and mobile screenshots,
+4. record concrete failures,
+5. change the smallest responsible prompt, skill, validator, or runtime behavior,
+6. rerun the same case and compare.
+
+Earlier v5 agent runs were useful runtime and validator comparisons, but the host
+still contained a disabled v2 extension and 12 legacy managed-skill directories.
+They were therefore not clean-install E2E evidence. Lifecycle behavior is now
+covered in an isolated temporary HOME, and the R8 DeepSeek comparison was run
+after `install:local:clean` with one v5 plugin source and no explicit extension
+double-load.
+
+## Commands
+
+- `/designer`: toggle for the current working directory
+- `/designer-doctor`: inspect source path, duplicate-install risk, runtime assets,
+  and MCP configuration
+
+## Runtime structure
+
+```text
+extension/index.ts               omp extension
+extensions/designer.ts           Pi extension
+skills/                          four conditional skills
+data/ui-ux-pro-max/              palette and typography search data
+scripts/fix-ai-slop.mjs          evidence-aware copy validator
+scripts/analyze-layout.mjs       proportional layout/contrast validator
+scripts/audit-data.mjs           CSV integrity and contrast audit
+scripts/audit-trace.mjs          duplicate-load and delivery trace audit
+scripts/real-agent-eval.mjs      real model comparison harness
+scripts/check-release.mjs        packed-artifact and secret release gate
+scripts/install-local.mjs        safe local-link installer
+scripts/uninstall-system.mjs     dry-run-first omp cleanup
+```
+
+## Requirements
+
+- Node.js 20.19 or newer
+- Pi or omp
+- `npm`/`npx`
+- a configured model provider for real-agent evaluations
+
+No API key belongs in this repository, chat transcript, command argument, or
+generated report.

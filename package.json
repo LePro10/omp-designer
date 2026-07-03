@@ -1,8 +1,8 @@
 {
   "name": "omp-designer",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "type": "module",
-  "description": "Autonomous AI design system with 12 skills, evidence tracking, deterministic validators, 161 palettes, and 57 font pairings.",
+  "description": "Focused UI/UX workflow for Pi and oh-my-pi with 4 conditional skills, evidence-aware checks, and browser-first review.",
   "keywords": [
     "pi-package",
     "pi",
@@ -35,29 +35,53 @@
       "./extension/index.ts"
     ]
   },
+  "bin": {
+    "omp-designer": "./scripts/lifecycle-cli.mjs"
+  },
   "files": [
-    "shared/",
     "extension/",
     "extensions/",
     "skills/",
     "data/",
-    "scripts/",
-    "eval/",
+    "scripts/analyze-layout.mjs",
+    "scripts/audit-data.mjs",
+    "scripts/audit-trace.mjs",
+    "scripts/check-release.mjs",
+    "scripts/fix-ai-slop.mjs",
+    "scripts/install-local.mjs",
+    "scripts/lifecycle-cli.mjs",
+    "scripts/lifecycle-lib.mjs",
+    "scripts/real-agent-eval.mjs",
+    "scripts/security.mjs",
+    "scripts/uninstall-system.mjs",
     "docs/",
     "AGENTS.md",
+    "architecture.md",
     "package.json"
   ],
   "scripts": {
-    "test:skill-gate": "node scripts/__tests__/skill-gate.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:extension": "bun test scripts/__tests__/extension.test.ts",
     "test:validators": "node scripts/__tests__/fix-ai-slop.test.mjs",
     "test:layout": "node scripts/__tests__/analyze-layout.test.mjs",
+    "test:lifecycle": "node scripts/__tests__/lifecycle.test.mjs",
+    "test:data": "node scripts/audit-data.mjs",
     "test:trace": "node scripts/__tests__/audit-trace.test.mjs",
     "test:prompt": "node scripts/__tests__/prompt-contract.test.mjs",
     "test:security": "node scripts/__tests__/security.test.mjs",
-    "test:eval": "node scripts/eval-suite.mjs validate",
-    "test:e2e": "node scripts/e2e-test.mjs",
+    "test": "npm run typecheck && npm run test:extension && npm run test:validators && npm run test:layout && npm run test:lifecycle && npm run test:data && npm run test:trace && npm run test:prompt && npm run test:security",
+    "test:real": "node scripts/real-agent-eval.mjs",
+    "system:inspect": "node scripts/uninstall-system.mjs",
+    "uninstall:system": "node scripts/uninstall-system.mjs",
+    "uninstall:system:apply": "node scripts/uninstall-system.mjs --apply",
+    "install:local": "node scripts/install-local.mjs",
+    "install:local:apply": "node scripts/install-local.mjs --apply",
+    "install:local:clean": "node scripts/install-local.mjs --apply --clean",
     "check:release": "node scripts/check-release.mjs",
-    "prepublishOnly": "npm run check:release && npm run test:skill-gate && npm run test:validators && npm run test:layout && npm run test:trace && npm run test:prompt && npm run test:security && npm run test:eval"
+    "prepublishOnly": "npm test && npm run check:release"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

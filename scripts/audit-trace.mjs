@@ -1,78 +1,79 @@
 #!/usr/bin/env node
 /**
- * audit-trace.mjs - verify designer run JSONL traces.
- *
- * Usage:
- *   node scripts/audit-trace.mjs <trace.jsonl> [--strict]
- *
- * Default checks prove the mechanical gates fired. --strict also requires that
- * the agent itself called build/browser-impeccable-like checks before session end.
+ * Audit v5 designer JSONL traces for duplicate loading and delivery outcomes.
  */
+
 import { readFileSync } from "node:fs";
 
-const tracePath = process.argv[2];
+const path = process.argv[2];
 const strict = process.argv.includes("--strict");
-if (!tracePath || tracePath === "--help" || tracePath === "-h") {
+if (!path || path === "--help" || path === "-h") {
   console.log("Usage: node scripts/audit-trace.mjs <trace.jsonl> [--strict]");
-  process.exit(tracePath ? 0 : 1);
+  process.exit(path ? 0 : 2);
 }
 
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
-
-function loadTrace(path) {
-  return readFileSync(path, "utf-8")
+let events;
+try {
+  events = readFileSync(path, "utf8")
     .split("\n")
-    .filter((line) => line.trim().length > 0)
+    .filter(Boolean)
     .map((line, index) => {
       try {
         return JSON.parse(line);
       } catch (error) {
-        fail(`Invalid JSON at ${path}:${index + 1}: ${error.message}`);
+        throw new Error(`Invalid JSON at line ${index + 1}: ${error instanceof Error ? error.message : String(error)}`);
       }
     });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(2);
 }
 
-function hasEvent(events, name) {
-  return events.some((event) => event.event === name);
-}
-
-function commandKinds(events) {
-  return new Set(events.map((event) => event.commandKind).filter(Boolean));
-}
-
-const events = loadTrace(tracePath);
 const failures = [];
-const kinds = commandKinds(events);
+const warnings = [];
+const counts = {};
+for (const event of events) counts[event.event] = (counts[event.event] ?? 0) + 1;
 
-for (const required of ["prompt_injected", "auto_validation_started"]) {
-  if (!hasEvent(events, required)) failures.push(`missing event: ${required}`);
+const duplicateEvents = [];
+for (let index = 1; index < events.length; index += 1) {
+  const previous = events[index - 1];
+  const current = events[index];
+  if (
+    previous.event === current.event &&
+    previous.timestamp === current.timestamp &&
+    previous.cwd === current.cwd
+  ) {
+    duplicateEvents.push(index + 1);
+  }
 }
 
-if (!hasEvent(events, "auto_validation_passed") && !hasEvent(events, "auto_validation_failed")) {
-  failures.push("missing auto_validation_passed or auto_validation_failed");
+if (duplicateEvents.length > 0) {
+  failures.push(`probable duplicate extension load at ${duplicateEvents.length} adjacent events`);
 }
-
-if (!hasEvent(events, "skills_discovered")) failures.push("missing event: skills_discovered");
-
-if (strict) {
-  if (!kinds.has("fix-ai-slop")) failures.push("strict: agent never called fix-ai-slop");
-  if (!kinds.has("analyze-layout")) failures.push("strict: agent never called analyze-layout");
-  if (!kinds.has("npm-run-build") && !kinds.has("bun-run-build")) failures.push("strict: agent never called a build script");
+if (!counts.prompt_injected) failures.push("missing prompt_injected");
+if (!counts.delivery_checks_passed && !counts.delivery_checks_failed) {
+  failures.push("missing delivery check outcome");
 }
+if (counts.skill_gate_blocked || counts.session_stop_gate_not_ready) {
+  failures.push("legacy skill-gate events are present");
+}
+if ((counts.delivery_checks_failed ?? 0) > 2) {
+  failures.push("more than two delivery failures indicate a continuation loop");
+}
+if (strict && !counts.delivery_checks_passed) failures.push("strict: delivery checks never passed");
+if (!strict && !counts.delivery_checks_passed) warnings.push("delivery checks did not pass");
 
-const summary = {
-  trace: tracePath,
+const report = {
+  trace: path,
   events: events.length,
   first: events[0]?.timestamp ?? null,
   last: events.at(-1)?.timestamp ?? null,
-  commandKinds: [...kinds].sort(),
-  autoValidation: hasEvent(events, "auto_validation_passed") ? "passed" : hasEvent(events, "auto_validation_failed") ? "failed" : "missing",
+  counts,
+  duplicateEvents,
   strict,
   failures,
+  warnings,
 };
 
-console.log(JSON.stringify(summary, null, 2));
-if (failures.length > 0) process.exit(1);
+console.log(JSON.stringify(report, null, 2));
+process.exit(failures.length > 0 ? 1 : 0);

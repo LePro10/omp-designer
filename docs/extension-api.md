@@ -1,93 +1,73 @@
-# omp Extension API Rules
+# Extension API notes
 
-## The Factory Function Rule (CRITICAL)
+These are the runtime assumptions used by v5 and covered by integration tests.
 
-omp extensions MUST export a factory function — a plain object will crash:
+## Export a factory
 
 ```typescript
-// ✅ CORRECT:
-export default function (pi: any) {
-  pi.registerCommand("designer", { ... });
-  pi.on("resources_discover", () => { ... });
+export default function extension(pi: ExtensionAPI): void {
+  pi.registerCommand("designer", options);
+  pi.on("before_agent_start", handler);
 }
-
-// ❌ WRONG — crashes with "not a valid factory function":
-export default {
-  commands: new Map([["designer", { ... }]]),
-  handlers: new Map([["resources_discover", [...]]]),
-};
 ```
 
-## The `return {}` Rule (CRITICAL)
+A plain object is not a valid extension.
 
-Handlers that should return nothing MUST return `undefined` (no return or `return;`).
-Returning `{}` will crash:
+## Return `undefined` when inactive
 
 ```typescript
-// ✅ CORRECT (mode OFF):
-pi.on("resources_discover", () => {
-  if (!isOn()) return; // ← undefined, fine
-  return { skillPaths: [...] };
-});
-
-// ❌ WRONG — will crash somewhere in omp internals:
-pi.on("resources_discover", () => {
-  if (!isOn()) return {}; // ← EXPLODES
+pi.on("resources_discover", (_event, ctx) => {
+  if (!isEnabled(ctx?.cwd)) return;
+  return { skillPaths };
 });
 ```
 
-## The `message` vs `systemPrompt` Rule (CRITICAL)
+Do not return an empty object from a handler whose event expects a specific
+result shape.
 
-In `before_agent_start`, NEVER use `message` — it crashes with
-`h.content is undefined`. Always use `systemPrompt`:
+## Prompt injection
+
+`before_agent_start` modifies `systemPrompt`. Normalize the existing value,
+remove an earlier designer marker, and append one prompt. Do not return a
+synthetic message.
 
 ```typescript
-// ✅ CORRECT:
-pi.on("before_agent_start", (event: any) => {
-  if (!isOn()) return;
-  const existing = event?.systemPrompt;
-  const prompts = Array.isArray(existing) ? existing : existing ? [existing] : [];
-  return { systemPrompt: [...prompts, MY_PROMPT] };
-});
-
-// ❌ WRONG — crashes:
-pi.on("before_agent_start", () => {
-  return { message: "some text" };
-});
+return { systemPrompt: [...basePrompts, DESIGNER_PROMPT] };
 ```
 
-## Available Events
+## Events used
 
-| Event | Returns | Purpose |
-|-------|---------|---------|
-| `resources_discover` | `{ skillPaths: string[] } \| undefined` | Inject skills into context |
-| `before_agent_start` | `{ systemPrompt: string[], message?: any } \| undefined` | Modify system prompt |
-| `context` | Modified messages array | Alter conversation before sending |
-| `tool_result` | Modified tool result | Intercept/alter tool output |
-| `input` | Modified text/image input | Alter user input before processing |
+| Event | v5 purpose |
+| --- | --- |
+| `resources_discover` | expose four package-relative skills |
+| `before_agent_start` | inject one current designer prompt |
+| `session_stop` | bounded validator/build backstop |
 
-## Available Commands (registerCommand)
+`tool_call` and `tool_result` are intentionally not used for workflow gating.
+
+## Session-stop result
+
+A failed delivery check may return:
 
 ```typescript
-pi.registerCommand("command-name", {
-  description: "what it does",
-  aliases: ["alt-name"],
-  handler: (args: any, ctx: any) => {
-    ctx?.ui?.notify?.("message", "info");
-    ctx?.editor?.setText?.("");
-  },
-});
+{
+  continue: true,
+  additionalContext: "Fix the listed objective blockers and rerun checks."
+}
 ```
 
-## Available API Methods (`pi`)
+The extension permits only one repair continuation for a session. A subsequent
+failure is reported normally instead of creating a loop. Warnings alone do not
+request continuation.
 
-| Method | Purpose |
-|--------|---------|
-| `pi.registerCommand(name, opts)` | Register slash command |
-| `pi.on(event, callback)` | Register event handler |
-| `pi.registerTool(tool)` | Register a custom tool |
-| `pi.registerShortcut(key, opts)` | Register keyboard shortcut |
-| `pi.registerFlag(name, opts)` | Register CLI flag |
-| `pi.setModel(f)` | Change active model |
-| `pi.getFlag(name)` | Get flag value |
-| `pi.on(event, callback)` | Event listener |
+## Duplicate registration
+
+An extension can be discovered through more than one loader realm. Use a
+process-wide marker and an atomic process-scoped lock in addition to a
+`globalThis` symbol. The integration test calls the factory twice and expects one
+command/handler set; a real CLI smoke test verifies separate loader realms.
+
+## Context
+
+Prefer `ctx.cwd`, falling back to `process.cwd()`. State, traces, checks, and
+doctor output must all refer to the same resolved project directory.

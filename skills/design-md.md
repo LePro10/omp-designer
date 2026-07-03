@@ -1,163 +1,98 @@
 ---
 name: design-md
-description: "Generate and maintain a DESIGN.md — the complete visual system specification. Every component implements this spec, not the agent's defaults."
+description: "Create a compact visual-system contract for new pages and major redesigns."
 ---
 
-# DESIGN.md — Visual System Specification
+# Visual System
 
-After choosing a palette and typography, write a `DESIGN.md` to `local://DESIGN.md`. This is the authoritative visual system. Every component implements it.
+Use this skill for a new page, a major redesign, or work that introduces a new
+visual language. Skip it for small edits inside an established system.
 
-## When to write
+## DESIGN.md contract
 
-- **Step 4 (Plan)** — after choosing palette, fonts, and dial values
-- **Update** if the design direction changes
-
-## What to include
+Keep DESIGN.md short enough to use while building:
 
 ```markdown
-# DESIGN.md — Visual System
+# DESIGN.md
 
-## Brand
-- Name: [product name]
-- Voice: [3 adjectives from PRODUCT.md]
-- Anti-patterns: [what to avoid]
+## Direction
+One project-specific art-direction sentence.
 
-## Color System
-Source row: [colors.csv row number + product type]
-[Exact hex values from the chosen palette row]
-- Primary: #hex — [usage: buttons, links, active states]
-- On Primary: #hex
-- Secondary: #hex — [usage: secondary buttons, badges]
-- On Secondary: #hex
-- Accent: #hex — [usage: CTAs, highlights, one per page]
-- On Accent: #hex
-- Background: #hex — [page background]
-- Foreground: #hex — [body text]
-- Card: #hex — [card surfaces]
-- Card Foreground: #hex — [card text]
-- Muted: #hex — [subtle backgrounds, dividers]
-- Muted Foreground: #hex — [secondary text, captions]
-- Border: #hex — [borders, dividers]
-- Destructive: #hex — [errors, delete actions]
-- On Destructive: #hex
-- Ring: #hex — [focus rings]
+## Color
+Source: existing brand | user | colors.csv row N | custom rationale
+- background / foreground
+- surface / surface foreground
+- primary / primary foreground
+- accent / accent foreground
+- muted / muted foreground
+- border / focus / destructive
 
-Dark mode:
-- Source: [same palette row or documented derivation]
-- Background: #hex
-- Foreground: #hex
-- Card: #hex
-- Card Foreground: #hex
-- Muted: #hex
-- Muted Foreground: #hex
-- Border: #hex
-- Primary/Secondary/Accent/Ring: [same as row unless explicitly documented]
-## Typography
-Source row: [typography.csv row number + pairing name]
-- Heading Font: [exact CSV heading font]
-- Body Font: [exact CSV body font]
-- Display: [font name] [weight] [size] [tracking] [leading]
-- H1: [font name] [weight] [size] [tracking] [leading]
-- H2: [font name] [weight] [size] [tracking] [leading]
-- H3: [font name] [weight] [size] [tracking] [leading]
-- Body: [font name] [weight] [size] [tracking] [leading]
-- Small/Caption: [font name] [weight] [size] [tracking] [leading]
-- Mono/Code: [font name] [weight] [size] [tracking] [leading]
+## Type
+Source: existing brand | typography.csv row N | custom rationale
+- display, heading, body, label, mono roles
+- responsive sizes, weights, line heights, maximum measure
 
-Type scale ratio: [e.g., 1.25 — each step is 1.25x the previous]
-Max line length: [e.g., 65ch for body text]
+## Geometry
+- container and grid
+- spacing scale
+- radius and border rules
+- elevation rules
 
-## Spacing
-Base unit: 4px
-Scale: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128
+## Components
+Rules that are specific to this product.
 
-Section padding: [e.g., py-20 md:py-28]
-Component gap: [e.g., gap-6]
-Content max-width: [e.g., max-w-7xl]
+## Composition
+- section sequence and visual emphasis
+- where repeated containers are justified by content
+- which product-specific view or interaction carries the page
 
-## Grid
-Columns: [e.g., 12-column grid]
-Breakpoints: sm 640, md 768, lg 1024, xl 1280, 2xl 1536
-Container: [e.g., max-w-[1400px] mx-auto px-6]
+## Motion
+Only when motion exists: purpose, durations, easing, reduced-motion fallback.
 
-## Radius
-- Cards: [e.g., rounded-2xl (16px)]
-- Buttons: [e.g., rounded-lg (8px)]
-- Inputs: [e.g., rounded-lg (8px)]
-- Tags/Badges: [e.g., rounded-full]
-- [One consistent scale — no mixing]
-
-## Elevation
-- Level 0: [no shadow — flat surfaces]
-- Level 1: [subtle — cards, dropdowns]
-- Level 2: [medium — modals, popovers]
-- Level 3: [high — tooltips, toasts]
-[Shadow values with tinted shadows matching background hue]
-
-## Motion (see animate skill for canonical timing table)
-- Entrance: [duration 240-320ms] [easing] [property: opacity/transform] [distance]
-- Exit: [duration 160-220ms] [easing] [property]
-- Hover: [duration 140-200ms] [easing] [property]
-- Active/Press: [duration 80-120ms] [easing] [scale]
-- Stagger: [60-90ms between children]
-- Counters: [900-1200ms, final value visible]
-- Scroll-triggered: [whileInView/useScroll, viewport once, margin]
-- Pinned/horizontal: [desktop behavior + mobile stacked/snap fallback]
-- Reduced motion: [exact fallback behavior]
-
-## Component Patterns
-[How specific component types should look]
-- Hero: [layout approach — split, centered, asymmetric]
-- Feature cards: [layout — grid, bento, horizontal scroll]
-- Pricing: [layout — cards, comparison table, toggle]
-- Testimonials: [layout — carousel, grid, single quote]
-- CTA: [layout — full-width, inline, floating]
-- Footer: [layout — columns, minimal, comprehensive]
-
-## Image Style
-- Photography: [style — editorial, product-focused, lifestyle]
-- Treatment: [e.g., rounded corners, no border, subtle shadow]
-- Aspect ratios: [hero: 16:9, product: 4:3, avatar: 1:1]
-- Generation prompts: [base prompt template for consistent style]
-
-## Accessibility
-- Color contrast: WCAG AA minimum (4.5:1 body, 3:1 large text)
-- Focus indicators: visible on all interactive elements
-- Touch targets: minimum 44x44px
-- Semantic HTML: proper heading hierarchy, landmarks, alt text
-- Reduced motion: all animations respect prefers-reduced-motion
+## Responsive behavior
+What recomposes at content-driven breakpoints.
 ```
 
-## Rules
+## Palette selection
 
-- **Every value is exact.** No "about 16px" — it's `16px` or `rounded-lg`.
-- **One palette row.** All colors come from the chosen CSV row. No additions.
-- **One radius scale.** Pick one and use it everywhere. No mixing.
-- **One type scale.** Mathematical progression, not random sizes.
-- **Reference PRODUCT.md.** Brand voice and anti-patterns come from the brief.
+The CSV database is a search index, not an authority.
 
-## Technical Notes
+1. Preserve supplied or existing brand colors.
+2. Otherwise search `data/ui-ux-pro-max/colors.csv` for relevant rows.
+3. Read the complete candidate row and identify its exact row number.
+4. Check foreground/background pairs at their intended text sizes.
+5. Correct inaccessible pairs and document the correction.
+6. Use only the semantic roles the interface needs. A destructive token does not
+   need to appear visually when the product has no destructive action.
 
-### Tailwind CSS v4
-- Do NOT use `@utility` with nested media queries — Tailwind v4 doesn't support nesting inside `@utility` definitions.
-- Use `@layer utilities` for custom utilities instead of `@utility` when you need media queries.
-- For responsive custom properties, use CSS `@media` queries in `@layer base` or `@layer components`, not inside utilities.
-- Tailwind v4 uses `@import "tailwindcss"` instead of `@tailwind base/components/utilities`.
-- Dark mode: use `.dark` class on `<html>` with CSS variables, not Tailwind's `dark:` prefix for complex theming.
+Do not validate a color merely because it appears somewhere in the 161-row file.
 
-### Motion Library (motion/react)
-- Import: `import { motion } from "motion/react"` (NOT framer-motion)
-- Ease arrays must be typed as tuples: `as [number, number, number, number]` or use `as const`
-- For scroll-linked animations, use `useScroll` + `useTransform` from `motion/react`
-- `AnimatePresence` is in `motion/react`, not a separate import
-- Package: `npm install motion` (NOT framer-motion)
+## Typography selection
 
-### Image Generation
-- Use `generate_image` tool for 1-3 key visuals (hero, product, atmosphere)
-- Prompt format: describe the scene, style, lighting, and composition
-- Always verify generated images render correctly before shipping
-- Fallback: `https://picsum.photos/seed/{descriptive-seed}/{w}/{h}` for placeholders
+1. Preserve existing brand type when supplied.
+2. Otherwise search `data/ui-ux-pro-max/typography.csv` by mood and reading need.
+3. Confirm the font exists, is licensable for the project, and supports required
+   scripts and weights.
+4. Prefer system fonts when performance, platform consistency, or privacy matters.
+5. Do not ban a font only because it is popular; reject it when it fails the
+   project's voice or reading conditions.
 
-## Why this matters
+## Accessibility baseline
 
-Without DESIGN.md, the agent invents a new design system for every component. The hero has one radius, the cards have another, the buttons have a third. DESIGN.md is the single source of truth that makes the output consistent and intentional.
+- WCAG 2.2 AA contrast for normal text and controls.
+- Visible focus on every keyboard-reachable control.
+- Minimum 44 by 44 CSS pixel touch targets where practical.
+- Logical headings, landmarks, labels, names, and error messages.
+- Content remains usable at 200 percent zoom and narrow widths.
+- Motion is never required to understand content or complete a task.
+
+## Implementation
+
+Prefer semantic CSS variables consumed by components. Avoid isolated hex values,
+spacing values, radii, and shadows that bypass the contract. Existing projects may
+use Tailwind, CSS modules, design-system packages, or native CSS; follow their
+established mechanism rather than forcing a new one.
+
+Do not make every content group a floating rounded card. Container treatment must
+communicate grouping, hierarchy, interaction, or state. Plain typography,
+dividers, tables, diagrams, and continuous canvases are valid structures.

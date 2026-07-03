@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const script = new URL("../fix-ai-slop.mjs", import.meta.url).pathname;
 const cases = [];
@@ -13,132 +13,299 @@ function test(name, fn) {
 }
 
 function fixture(files) {
-  const dir = mkdtempSync(join(tmpdir(), "fix-ai-slop-"));
+  const dir = mkdtempSync(join(tmpdir(), "designer-copy-"));
   for (const [path, content] of Object.entries(files)) {
     const full = join(dir, path);
-    mkdirSync(full.split("/").slice(0, -1).join("/"), { recursive: true });
+    mkdirSync(dirname(full), { recursive: true });
     writeFileSync(full, content);
   }
   return dir;
 }
 
-function run(args) {
-  return spawnSync(process.execPath, [script, ...args], { encoding: "utf-8" });
+function run(dir, env = {}) {
+  return spawnSync(process.execPath, [script, "--check", dir], {
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
 }
 
-test("check mode reports em-dashes without mutating files", () => {
-  const dir = fixture({ "src/App.tsx": "export const copy = 'Quiet — focused';\n" });
+test("dash is a warning and does not block or mutate", () => {
+  const original = "export const copy = 'Quiet — focused work.';\n";
+  const dir = fixture({ "src/App.tsx": original });
   try {
-    const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout, /em-dash/);
-    assert.equal(readFileSync(join(dir, "src/App.tsx"), "utf-8"), "export const copy = 'Quiet — focused';\n");
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("fix mode rewrites em-dashes deterministically", () => {
-  const dir = fixture({ "src/App.tsx": "export const copy = 'Quiet — focused';\n" });
-  try {
-    const result = run(["--fix", dir]);
+    const result = run(dir);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.equal(readFileSync(join(dir, "src/App.tsx"), "utf-8"), "export const copy = 'Quiet, focused';\n");
+    assert.match(result.stdout, /copy-cadence/);
+    assert.equal(readFileSync(join(dir, "src/App.tsx"), "utf8"), original);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("compound fonts do not trigger overused root-font bans", () => {
-  const dir = fixture({ "src/style.css": ".code { font-family: 'Roboto Mono', monospace; }\n" });
-  try {
-    const result = run(["--check", dir]);
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("avoidance documentation can mention banned buzzwords", () => {
-  const dir = fixture({ "DESIGN.md": "Avoid: unlock, seamless, innovative, curated.\n" });
-  try {
-    const result = run(["--check", dir]);
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("spaced multipliers are still fake precision", () => {
-  const dir = fixture({ "src/App.tsx": "export const claim = 'Teams move 12 x faster here.';\n" });
-  try {
-    const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout, /fake-number:multiplier/);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("EVIDENCE.md may document forbidden commerce claims", () => {
+test("CSS and class percentages are not treated as claims", () => {
   const dir = fixture({
-    "EVIDENCE.md": "| Claim | Source | Confidence | Allowed wording |\n| returns | missing | 0 | MUST NOT USE |\n"
+    "src/App.tsx": "export default () => <div className=\"w-[80%] translate-x-[50%]\">Hello there</div>;\n",
+    "src/style.css": ".meter { width: 80%; transform: translateX(50%); }\n",
   });
   try {
-    const result = run(["--check", dir]);
+    assert.equal(run(dir).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("unsupported visible percentage blocks", () => {
+  const dir = fixture({ "src/App.tsx": "export default () => <p>Teams finish projects 47% faster.</p>;\n" });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-percentage/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("spelled-out performance time blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <h2>Three minutes per site visit</h2>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-count/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("unsupported audience range blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <p>Built for 2 to 20 people in the field.</p>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-count/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("user-sourced visible percentage passes", () => {
+  const dir = fixture({
+    "PRODUCT.md": "- Source: user — measured result is 47% faster.\n",
+    "src/App.tsx": "export default () => <p>Measured result: 47% faster.</p>;\n",
+  });
+  try {
+    assert.equal(run(dir).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("blocked evidence does not authorize a claim", () => {
+test("trusted user facts override a model-authored ledger", () => {
+  const dir = fixture({
+    "PRODUCT.md": "- Source: user — measured result is 47% faster.\n",
+    "src/App.tsx": "export default () => <p>Measured result: 47% faster.</p>;\n",
+  });
+  try {
+    const result = run(dir, { DESIGNER_USER_FACTS: "Build a project without invented metrics." });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-percentage/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("trusted user facts can authorize an exact claim", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <p>Measured result: 47% faster.</p>;\n",
+  });
+  try {
+    const result = run(dir, { DESIGNER_USER_FACTS: "The measured result is 47% faster." });
     assert.equal(result.status, 0, result.stdout + result.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("TypeScript return type annotations are not commerce claims", () => {
-  const dir = fixture({ "src/App.tsx": "export function useData(): { returns: string } { return { returns: 'value' }; }\n" });
+  const dir = fixture({
+    "EVIDENCE.md": "| 47% faster | none | blocked | omit |\n",
+    "src/App.tsx": "export default () => <p>Work gets 47% faster.</p>;\n",
+  });
   try {
-    const result = run(["--check", dir]);
-    assert.equal(result.status, 0, "TS return-type keyword should not trigger commerce:returns — stdout: " + result.stdout);
+    assert.equal(run(dir).status, 1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("multiplication sign × is caught as fake precision (false negative)", () => {
-  const dir = fixture({ "src/App.tsx": "export const claim = 'Get 12× better results.';\n" });
+test("unsupported social proof blocks", () => {
+  const dir = fixture({ "src/App.tsx": "export default () => <p>Trusted by product teams.</p>;\n" });
   try {
-    const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0, "Unicode multiplication sign should be caught");
-    assert.match(result.stdout, /fake-number:multiplier/);
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-social-proof/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("en-dash – is caught like em-dash (false negative)", () => {
-  const dir = fixture({ "src/App.tsx": "export const copy = 'Quiet – focused';\n" });
+test("unsupported co-design social proof blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <p>Built with input from real field teams.</p>;\n",
+  });
   try {
-    const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0, "En-dash should be caught as em-dash variant");
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-social-proof/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("indirect social proof with real company names is caught", () => {
-  const dir = fixture({ "src/App.tsx": "export const copy = 'Teams at Stripe and Vercel ship faster with us.';\n" });
+test("unsupported commerce promise blocks", () => {
+  const dir = fixture({ "src/App.tsx": "export default () => <p>Free shipping on every order.</p>;\n" });
   try {
-    const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0, "Indirect social proof should be caught");
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-commerce-claim/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("buzzword synonym 'effortless' is caught after list expansion", () => {
-  const dir = fixture({ "src/App.tsx": "export const copy = 'Effortless integration for modern teams.';\n" });
+test("unsupported free-access promise blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <p>Free during early access. No credit card needed.</p>;\n",
+  });
   try {
-    const result = run(["--check", dir]);
-    assert.notEqual(result.status, 0, "'effortless' should be caught as a buzzword");
-    assert.match(result.stdout, /buzzword:effortless/);
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-commerce-claim/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("unsupported release status blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <><button>Get early access</button><p>You're on the list</p></>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /unsupported-release-status/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("inferred capability is a review warning", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <p>Your notes sync automatically when you are back online.</p>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /unsupported-capability-signal/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("placeholder primary action blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <a href=\"#\">Join the waitlist</a>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /nonfunctional-action/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("local-only email signup blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <form onSubmit={e => e.preventDefault()}><input type=\"email\" /><button>Stay updated</button><p>We will be in touch.</p></form>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /nonfunctional-signup/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("relative fetch without a server route still blocks", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <form onSubmit={() => fetch('/api/waitlist')}><input type=\"email\" /><p>We will be in touch.</p></form>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /nonfunctional-signup/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("email form with a delivery action passes the behavior check", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <form action=\"/subscribe\"><input type=\"email\" /><button>Stay updated</button><p>We will be in touch.</p></form>;\n",
+  });
+  try {
+    assert.equal(run(dir).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("logo hash link remains allowed", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <a href=\"#\">Fieldnote</a>;\n",
+  });
+  try {
+    assert.equal(run(dir).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("comments are ignored", () => {
+  const dir = fixture({
+    "src/App.tsx": "// TODO remove the fake 99% claim\nexport default () => <p>Clear project status.</p>;\n",
+  });
+  try {
+    assert.equal(run(dir).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("apostrophes in JSX text do not create cross-component candidates", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <><p>It isn't a claim.</p><div className=\"w-[47%]\">Layout</div><p>It's practical.</p></>;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("remote placeholder asset is warning only", () => {
+  const dir = fixture({
+    "src/App.tsx": "export default () => <img src=\"https://picsum.photos/800/600\" alt=\"Workshop\" />;\n",
+  });
+  try {
+    const result = run(dir);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /remote-placeholder-asset/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -157,4 +324,4 @@ for (const { name, fn } of cases) {
 }
 
 if (failed > 0) process.exit(1);
-console.log(`\n${cases.length} validator regression tests passed`);
+console.log(`\n${cases.length} copy/evidence tests passed`);
