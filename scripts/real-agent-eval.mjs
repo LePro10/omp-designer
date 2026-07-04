@@ -21,6 +21,7 @@ import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { inspectOmpSystem } from "./lifecycle-lib.mjs";
 import { buildDesignQualityReport } from "../shared/design-quality.mjs";
+import { analyzeScreenshot } from "../shared/screenshot-analysis.mjs";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -46,10 +47,39 @@ const prompts = {
   multipage: "Build a responsive multi-page site for a community woodworking studio: a home page, a classes page, and a contact page as separate routes. Provide real navigation between them. Do not invent prices or class schedules. Build immediately without asking questions.",
   "plan-en": "Create a plan for a multi-page portfolio site and wait for my approval before building anything.",
   "plan-de": "Erstelle zuerst einen Plan für eine mehrseitige Portfolio-Website und warte auf meine Freigabe, bevor du etwas umsetzt.",
+  // Normal-user prompts: deliberately vague. The agent must infer art direction,
+  // structure, and content on its own. Do not add specification to these.
+  "coffee-brand": "make a beautiful website for my coffee brand",
+  "fan-aio": "create a landing page for a premium PC fan and AIO brand",
+  "ai-product": "make a stunning website for an AI product",
+  "furniture-surprise": "surprise me with a website for a furniture studio",
+  "robotics-antislop": "make a website for my robotics startup, but avoid generic gradients and SaaS clichés",
+  "bakery-mobile": "make a mobile-first site for a local bakery",
+  "style-apple": "build me a website for my smart home hub, in the style of apple",
+  "skincare-shop": "make a landing page for my skincare brand's online shop",
+  "editorial-mag": "build a website for an independent architecture magazine, editorial like a newspaper",
+  "portfolio-brutalist": "make me a bold brutalist portfolio site",
 };
 
+// --suite runs the normal-user prompt corpus sequentially as release evidence.
+if (args.includes("--suite")) {
+  const suite = ["coffee-brand", "fan-aio", "ai-product", "furniture-surprise", "robotics-antislop", "bakery-mobile"];
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+  const suiteMaxTime = value("--max-time", "1200");
+  let failedRuns = 0;
+  for (const suiteCase of suite) {
+    console.log(`\n=== suite case: ${suiteCase} ===`);
+    const result = spawnSync(process.execPath, [
+      process.argv[1], "--run", `suite-${stamp}-${suiteCase}`, "--case", suiteCase, "--max-time", suiteMaxTime,
+    ], { stdio: "inherit" });
+    if (result.status !== 0) failedRuns += 1;
+  }
+  console.log(`\nSuite finished: ${suite.length - failedRuns}/${suite.length} runs completed. Review reports and screenshots per run.`);
+  process.exit(failedRuns > 0 ? 1 : 0);
+}
+
 if (!runName && !evaluateOnly) {
-  console.error("Usage: node scripts/real-agent-eval.mjs --run <name> [--case saas|editorial] [--baseline <path>]");
+  console.error("Usage: node scripts/real-agent-eval.mjs --run <name> [--case saas|editorial] [--baseline <path>] [--suite]");
   process.exit(2);
 }
 if (!(caseName in prompts)) {
@@ -195,9 +225,17 @@ function sourceText(dir) {
 
 function compositionSignals(dir) {
   const source = sourceText(dir);
-  const equalGridSections = (source.match(/\b(?:sm:|md:|lg:|xl:)?grid-cols-[234]\b/g) ?? []).length;
-  const roundedSurfaces = (source.match(/\brounded-(?:lg|xl|2xl|3xl)\b/g) ?? []).length;
-  const motionComponents = (source.match(/<motion\./g) ?? []).length;
+  // Tailwind classes and vanilla CSS both count; a plain-CSS page must not
+  // bypass composition review by never using a utility class.
+  const equalGridSections =
+    (source.match(/\b(?:sm:|md:|lg:|xl:)?grid-cols-[234]\b/g) ?? []).length +
+    (source.match(/grid-template-columns:\s*repeat\(\s*[234]\s*,/g) ?? []).length;
+  const roundedSurfaces =
+    (source.match(/\brounded-(?:lg|xl|2xl|3xl)\b/g) ?? []).length +
+    (source.match(/border-radius:\s*(?:1[2-9]|[2-9]\d)px|border-radius:\s*(?:0?\.75|1|1\.25|1\.5|2)rem/g) ?? []).length;
+  const motionComponents =
+    (source.match(/<motion\./g) ?? []).length +
+    (source.match(/@keyframes\s+/g) ?? []).length;
   const signals = [];
   if (equalGridSections >= 3) {
     signals.push("Repeated equal-column grids require visual review; the page may be compositionally repetitive.");
@@ -212,7 +250,14 @@ function compositionSignals(dir) {
 }
 
 function buildCheck(dir) {
-  if (!existsSync(join(dir, "package.json"))) return { ok: false, status: null, output: "package.json missing" };
+  if (!existsSync(join(dir, "package.json"))) {
+    // A deliberate static site (plain index.html) has nothing to build; that is
+    // not a delivery failure and must not outscore taste problems in the report.
+    if (existsSync(join(dir, "index.html"))) {
+      return { ok: true, status: null, output: "static site without a build system" };
+    }
+    return { ok: false, status: null, output: "package.json missing" };
+  }
   try {
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
     if (!pkg.scripts?.build) return { ok: false, status: null, output: "build script missing" };
@@ -239,6 +284,31 @@ function evaluate(dir, userFacts = "") {
   const freshScreenshotCount = screenshotMtimes.filter((mtime) => mtime >= latestSourceMtime).length;
   const screenshotsFresh = freshScreenshotCount >= 2;
   const composition = compositionSignals(dir);
+
+  // Content analysis: a full-page screenshot dominated by uniform rows shows
+  // nothing (hidden scroll-reveal content or wallpaper), whatever mtime says.
+  const screenshotContent = screenshotPaths
+    .filter((path) => /\.png$/i.test(path))
+    .map((path) => analyzeScreenshot(path))
+    .map(({ path, error, fullPage, blankRowFraction, maxBlankRunFraction }) => ({
+      file: basename(path),
+      ...(error
+        ? { error }
+        : {
+            fullPage,
+            blankRowFraction: Math.round(blankRowFraction * 100) / 100,
+            maxBlankRunFraction: Math.round(maxBlankRunFraction * 100) / 100,
+          }),
+    }));
+  const worstBlankRun = Math.max(
+    0,
+    ...screenshotContent.filter((entry) => entry.fullPage).map((entry) => entry.maxBlankRunFraction ?? 0),
+  );
+  if (worstBlankRun >= 0.3) {
+    composition.signals.push(
+      `A full-page screenshot has a contiguous blank band covering ${Math.round(worstBlankRun * 100)}% of the page; content is hidden at initial paint or the layout is empty.`,
+    );
+  }
   const designQuality = buildDesignQualityReport({
     projectDir: dir,
     userPrompt: userFacts,
@@ -257,6 +327,22 @@ function evaluate(dir, userFacts = "") {
   score += Math.min(15, artifacts.length * 5);
   if (sourceFiles >= 3) score += 5;
   if (screenshotsFresh) score += 5;
+  // Blank screenshot evidence caps the delivery score: a page whose capture is
+  // one-third void cannot be reported as a near-perfect delivery.
+  if (worstBlankRun >= 0.3) score = Math.min(score, 60);
+
+  // Detected slop rules subtract from the score so taste is visible in the
+  // number, not only in the issue list.
+  const SLOP_RULES = new Set([
+    "reveal-hidden-content", "ai-default-palette", "gradient-imagery", "gradient-heavy",
+    "remote-placeholder-asset", "stat-tile-claim", "contact-details-unverified",
+  ]);
+  const slopRuleHits = [...new Set(
+    [...(quality.report?.issues ?? []), ...(layout.report?.issues ?? [])]
+      .filter((issue) => SLOP_RULES.has(issue.rule))
+      .map((issue) => issue.rule),
+  )].sort();
+  score = Math.max(0, score - Math.min(15, slopRuleHits.length * 5));
 
   return {
     directory: dir,
@@ -271,9 +357,12 @@ function evaluate(dir, userFacts = "") {
       freshCount: freshScreenshotCount,
       latestSourceMtime: latestSourceMtime ? new Date(latestSourceMtime).toISOString() : null,
       oldestScreenshotMtime: oldestScreenshotMtime ? new Date(oldestScreenshotMtime).toISOString() : null,
+      content: screenshotContent,
+      worstBlankRun,
     },
     sourceFiles,
     warnings,
+    slopRuleHits,
     composition,
     designQuality,
     scoreScope: "Automated delivery score; visual quality requires the designReview rubric and screenshot review.",
@@ -311,7 +400,7 @@ async function generate() {
     "Keep every generated file inside that directory.",
     "Run the build and designer validation commands.",
     "Use browser QA at 375px and 1280px and save at least two screenshots inside the project.",
-    "For full-page screenshots, reset scroll to the top so sticky elements are captured in their initial position.",
+    "For full-page screenshots, first scroll through the whole page so lazy-loaded images are present, then reset scroll to the top so sticky elements are captured in their initial position.",
   ].join(" ");
 
   const commandArgs = [
@@ -335,7 +424,13 @@ async function generate() {
   const traceOffset = existsSync(tracePath) ? statSync(tracePath).size : 0;
   const child = spawn("omp", commandArgs, {
     cwd: target,
-    env: { ...process.env, OMP_DESIGNER_MODE: "1" },
+    env: {
+      ...process.env,
+      OMP_DESIGNER_MODE: "1",
+      // In-session visual reviews default to minimax-m3 unless overridden.
+      DESIGNER_REVIEW_MODEL: process.env.DESIGNER_REVIEW_MODEL || value("--review-model", "opencode-go/minimax-m3:high"),
+      DESIGNER_REVIEW_VIA: process.env.DESIGNER_REVIEW_VIA || value("--review-via", "omp"),
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let transcript = "";
@@ -376,6 +471,40 @@ try {
 
 const evaluationFacts = prompts[caseName];
 const candidate = evaluate(target, evaluationFacts);
+
+// Model-backed visual review. Defaults to opencode-go/minimax-m3 (vision-
+// capable, same API family as the default builder); override with
+// --review-model / DESIGNER_REVIEW_MODEL for other providers, --review-via
+// api for a local endpoint, or --no-review. Vision-blind reviewers are
+// rejected honestly and noted in the report rather than silently skipped.
+const DEFAULT_REVIEW_MODEL = "opencode-go/minimax-m3:high";
+const reviewModel = value("--review-model", process.env.DESIGNER_REVIEW_MODEL || DEFAULT_REVIEW_MODEL);
+const reviewVia = value("--review-via", process.env.DESIGNER_REVIEW_VIA ?? "omp");
+if (reviewModel && !args.includes("--no-review")) {
+  const reviewRun = run(process.execPath, [
+    join(root, "scripts", "design-review-cli.mjs"), "--target", target, "--model", reviewModel, "--via", reviewVia, "--json",
+  ], root, 420_000);
+  if (reviewRun.ok) {
+    try {
+      const parsedReview = JSON.parse(readFileSync(join(target, "design-review.json"), "utf8"));
+      candidate.designQuality.designReview = {
+        basis: `model-reviewed (${reviewModel})`,
+        categories: parsedReview.review,
+        verdict: parsedReview.verdict,
+        memorable: parsedReview.memorable,
+        topFixes: parsedReview.topFixes,
+      };
+    } catch {
+      console.error("design-review.json unreadable after review run");
+    }
+  } else {
+    const blind = /cannot view the images/i.test(reviewRun.output);
+    candidate.designQuality.designReview.basis = blind
+      ? `unavailable: reviewer model ${reviewModel} cannot view images`
+      : `failed: ${reviewRun.output.slice(-200)}`;
+    console.error(`Visual review ${blind ? "unavailable" : "failed"} (${reviewModel} via ${reviewVia}): ${reviewRun.output.slice(-300)}`);
+  }
+}
 const baselineResult = baseline && existsSync(baseline) ? evaluate(baseline, evaluationFacts) : null;
 const comparison = baselineResult
   ? {
@@ -411,6 +540,8 @@ console.log(JSON.stringify({
     warnings: candidate.warnings,
     screenshots: candidate.screenshots,
     screenshotsFresh: candidate.screenshotEvidence.fresh,
+    worstBlankRun: candidate.screenshotEvidence.worstBlankRun,
+    slopRuleHits: candidate.slopRuleHits,
     compositionSignals: candidate.composition.signals.length,
     extensionValid: agent?.extension?.valid ?? null,
     agentExitCode: agent?.exitCode ?? null,

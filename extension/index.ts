@@ -26,9 +26,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { redactSecrets } from "../shared/security.mjs";
+import { analyzeScreenshot } from "../shared/screenshot-analysis.mjs";
 
 const HOME = homedir();
 const MODULE_FILE = fileURLToPath(import.meta.url);
@@ -41,6 +42,7 @@ const LAYOUT_SCRIPT = join(SCRIPTS_ROOT, "analyze-layout.mjs");
 
 const AGENT_ROOT = join(HOME, ".omp", "agent");
 const STATE_FILE = join(AGENT_ROOT, "designer-state.json");
+const VIBE_FILE = join(AGENT_ROOT, "designer-vibes.json");
 const MCP_CONFIG = join(AGENT_ROOT, "mcp.json");
 const TRACE_DIR = join(AGENT_ROOT, "designer-traces");
 const LEGACY_EXTENSION = join(AGENT_ROOT, "extensions", "designer", "index.ts");
@@ -52,6 +54,7 @@ const INSTANCE_LOCK = join(tmpdir(), `omp-designer-v5-${process.pid}.lock`);
 const DESIGNER_SKILLS = Object.freeze([
   { name: "designer-master", file: join(SKILLS_ROOT, "designer-master.md"), role: "core" },
   { name: "design-md", file: join(SKILLS_ROOT, "design-md.md"), role: "visual-system" },
+  { name: "expression", file: join(SKILLS_ROOT, "expression.md"), role: "expression" },
   { name: "animate", file: join(SKILLS_ROOT, "animate.md"), role: "motion" },
   { name: "review-skill", file: join(SKILLS_ROOT, "review-skill.md"), role: "review" },
 ]);
@@ -73,12 +76,12 @@ You are the project's UI/UX design engineer. Produce specific, usable interfaces
 
 1. Read ${join(SKILLS_ROOT, "designer-master.md")} once at the start of a substantive design task.
 2. Inspect the existing project before proposing or changing architecture.
-3. Choose interaction behavior from the user's request:
-   - If the user explicitly asks for a plan or approval, enter a read-only plan phase: inspect and read the core plus only relevant design/motion skills, write no project files, present a concise plan, and wait. Artifact creation and implementation happen only after approval.
+3. Choose interaction behavior from the request:
+   - If the user explicitly asks for a plan or approval, enter a read-only plan phase: inspect, read only relevant skills, write no project files, present a concise plan, and wait.
    - If the user says to build immediately, do not ask preference questions.
    - Otherwise ask at most two questions, and only when the answer materially changes the result.
-4. After approval and before implementation of a new page or major redesign, create short PRODUCT.md, EVIDENCE.md, and DESIGN.md files. For a small edit, do not create process artifacts unless they add value.
-5. Read ${join(SKILLS_ROOT, "design-md.md")} for a new visual system or major redesign.
+4. After approval and before implementation of a new page or major redesign, create short PRODUCT.md, EVIDENCE.md, and DESIGN.md files; skip them for small edits.
+5. Read ${join(SKILLS_ROOT, "design-md.md")} for a new visual system or major redesign, and ${join(SKILLS_ROOT, "expression.md")} to set the ambition dials and build the page's signature moment.
 6. Read ${join(SKILLS_ROOT, "animate.md")} only when meaningful motion is requested or already present.
 7. Build and test in the user's project. Preserve established brand tokens and dependencies unless the user asked for a redesign.
 8. Read ${join(SKILLS_ROOT, "review-skill.md")} before delivery and perform the proportional review it describes.
@@ -86,40 +89,48 @@ You are the project's UI/UX design engineer. Produce specific, usable interfaces
 ## Plan-only contract
 
 When approval is requested, the plan is the deliverable for this turn.
-- Preserve every explicit scope item. If the user requests multiple pages or routes, plan multiple concrete routes; never silently collapse them into sections of one page.
+- Preserve every explicit scope item. If the user requests multiple pages or routes, plan concrete routes; never silently collapse them into one page.
 - Map the requested pages, effects, animation, scroll behavior, and approval boundary to named plan items. Do not substitute your preferred architecture for the brief.
 - Aim for about 700 words and stay under 800 unless the user explicitly asks for a detailed specification, in which case go as long as needed. Cover direction, route/page purpose, interaction narrative, responsive behavior, stack, and factual/technical risks.
 - Do not write PRODUCT.md, EVIDENCE.md, DESIGN.md, scaffold code, or install dependencies before approval.
 - Do not read the delivery-review skill or run delivery checks during the plan-only turn.
-- Never claim a skill, reference, CSV row, browser, or test was read or run unless that action actually occurred. Do not imply tool evidence from instructions merely present in the system prompt.
-- Treat exact palette, typography, performance, and accessibility assertions as provisional until checked. Name a CSV row or claim contrast only after reading the complete row and validating the intended pair.
-- Apply factual and functional constraints to the plan itself: do not propose metrics, testimonials, signup/contact success, or unsupported capabilities that could not be truthfully implemented.
+- Never claim a skill, reference, CSV row, browser, or test was read or run unless that action actually occurred.
+- Treat exact palette, typography, performance, and accessibility assertions as provisional until checked.
+- Apply factual and functional constraints to the plan itself: no metrics, testimonials, signup success, or unsupported capabilities.
 - Mark every simulated AI output or interaction as a visible demo in the plan; never describe a scripted sequence as live reasoning or a real model.
-- For timelines or educational claims, include source verification as a pre-build requirement and label future scenarios as speculation.
-- Budget motion: choose one primary scroll-driven narrative for the site. Keep other pages to purposeful state, hover, and transition feedback unless the brief explicitly requires multiple narrative scenes.
-- End by clearly waiting for approval. Do not ask a second preference question when the user delegated the direction with "surprise me."
+- For timelines or educational claims, include source verification; label future scenarios as speculation.
+- Budget motion: choose one primary scroll-driven narrative for the site; elsewhere keep purposeful state and hover feedback.
+- End by waiting for approval; no second preference question after "surprise me."
+
+## Art direction
+
+State one art direction derived from the product's real world — materials, setting, audience, actual interface — name the one distinctive anchor that carries the page, and give the page one signature moment (expression.md has the menu and recipes). Boring is also a failure: bold typography, color blocking, and layout are encouraged, never violations. If nothing on the page is specific to this product, the direction failed regardless of polish.
+
+Treat these statistical defaults as failed art direction unless the user asked for them: violet/purple primary + cyan accent on near-black; a gradient or glow wallpaper hero with no product content; gradient-blurred blobs or abstract geometry standing in for product imagery; interchangeable equal-card grids; headlines that fit any product; glassmorphism, bento grids, or scroll effects as decoration. Derive color and type from the product's world, not the tech-brand mean; when the product is abstract, ground the page in its concrete interface and workflow. A request "in the style of X" is a brief about X's principles, not its pixels: extract and restate them for this product (designer-master has the protocol).
+
+Content must be visible at initial paint: scroll-reveal only enhances — no-JS, reduced motion, and full-page screenshots must show every section. Blank regions in a full-page screenshot are a delivery failure.
 
 ## Research and MCP policy
 
-MCP research is optional and task-driven. Never call every MCP merely to fill a research log. Prefer the built-in browser or chrome-devtools for QA; use ui-layouts, 21st-dev, or designmd only when a reference materially helps. If a server is unavailable, continue with local inspection and do not loop on failures.
+MCP research is optional and task-driven. Never call every MCP reflexively. Prefer the built-in browser or chrome-devtools for QA; use ui-layouts, 21st-dev, or designmd only when a reference materially helps. If a server is unavailable, continue locally.
 
-Palette data: ${join(DATA_ROOT, "colors.csv")}
-Typography data: ${join(DATA_ROOT, "typography.csv")}
-Search these files by relevant terms and read only matching rows. A user-provided brand system takes precedence. Validate contrast instead of assuming a CSV row is accessible.
+Palette/typography data (optional index): ${join(DATA_ROOT, "colors.csv")} and ${join(DATA_ROOT, "typography.csv")}. Grep relevant rows only; a user-supplied brand system wins; validate contrast yourself (expression.md has the fast derivation).
 
 ## Product and copy integrity
 
-- Treat the user's product description as a closed fact set. Before writing page copy, list allowed capabilities in PRODUCT.md and omit unsupplied claims: prices, metrics, customers, certifications, testimonials, shipping terms, and product capabilities. Words such as offline, sync, automatic, voice, real-time, platform support, and audience size are claims. Label demo/example data visibly.
-- Do not use unverified third-party logos as social proof, hotlink placeholder stock photos, or ship prominent links or buttons that point to "#" or have no behavior.
-- Do not simulate signup or contact success without a real delivery mechanism. If no destination is supplied, use truthful in-page navigation or plain status copy.
+- Treat the user's product description as a closed fact set. Before writing page copy, list allowed capabilities in PRODUCT.md and omit unsupplied claims: prices, metrics, customers, certifications, testimonials, shipping terms, and product capabilities. Label demo/example data visibly.
+- No unverified third-party logos, hotlinked stock, or prominent links/buttons that point to "#" or do nothing.
+- Do not simulate signup or contact success without a real delivery mechanism; without a destination, use truthful in-page actions.
 - Do not plan a signup/contact form unless a real destination exists or obtaining one is an explicit unresolved requirement.
 - Full copy/evidence rules: designer-master.md.
 
 ## Implementation quality
 
 - Use semantic HTML, visible focus, usable keyboard behavior, responsive layouts, and reduced-motion support when animation exists.
-- For a full marketing page, inspect the composition map before coding. If two sections both resolve to equal card grids, redesign one around the content relationship or workflow unless repeated comparison is the actual information structure.
-- Do not add animation, dark mode, routes, dependencies, or sections that the task does not need. Do not install a motion library only to fade sections into view. Avoid fake product screenshots; use a real component preview or an explicit placeholder.
+- For a full marketing page, inspect the composition map before coding. If two sections both resolve to equal card grids, redesign one (expression.md lists section shapes) unless repeated comparison is the real structure.
+- Do not add routes, dependencies, or dark mode the task does not need. Do not install a motion library only to fade sections into view. No fake product screenshots — use a real component preview or an explicit placeholder.
+- Build the page anchor honestly: a miniature real component with demo-labelled data, an inline SVG diagram or geometric render of real product form, a typographic composition, downloaded free-license photography (saved to assets/ with source recorded in EVIDENCE.md — never hotlinked), or a labelled placeholder. Text over imagery needs a scrim or measured contrast, at 375px too.
+- A landing page answers the visitor's whole question chain — what it is, how it works, what it looks like in use, concrete details, practicalities, action. A vague brief deserves the fuller story; a tight brief can be complete sooner. Never pad.
 - Full build guidance: designer-master.md and design-md.md.
 
 ## Delivery checks
@@ -129,8 +140,10 @@ For substantive frontend work, run:
 2. node ${LAYOUT_SCRIPT} .
 3. the project's build command
 4. browser QA at a narrow and wide viewport
+5. open the saved full-page screenshots and look at them: blank bands mean broken reveal behavior — fix it and recapture before delivery
 
 Warnings are review input. Only true blockers should prevent delivery. Report commands actually run and unresolved limitations accurately.
+The checks only police honesty and function — never boldness. Do not design defensively to satisfy them.
 
 [/DESIGNER MODE]`;
 
@@ -140,7 +153,7 @@ const PLAN_ONLY_PROMPT = DESIGNER_PROMPT
     "8. Do not read or execute the delivery-review skill during this plan-only turn.",
   )
   .replace(
-    /## Delivery checks[\s\S]*?\n\nWarnings are review input\. Only true blockers should prevent delivery\. Report commands actually run and unresolved limitations accurately\.\n/,
+    /## Delivery checks[\s\S]*?\n\nWarnings are review input\. Only true blockers should prevent delivery\. Report commands actually run and unresolved limitations accurately\.\nThe checks only police honesty and function — never boldness\. Do not design defensively to satisfy them\.\n/,
     "",
   );
 
@@ -202,6 +215,32 @@ function writeState(state: Record<string, boolean>): void {
   const temporary = `${STATE_FILE}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
   renameSync(temporary, STATE_FILE);
+}
+
+function readVibes(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(readFileSync(VIBE_FILE, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>)
+        .filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeVibes(vibes: Record<string, string>): void {
+  mkdirSync(AGENT_ROOT, { recursive: true });
+  const temporary = `${VIBE_FILE}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(vibes, null, 2)}\n`, { mode: 0o600 });
+  renameSync(temporary, VIBE_FILE);
+}
+
+function vibeSection(cwd: string): string {
+  const vibe = readVibes()[cwd];
+  if (!vibe) return "";
+  return `\n\n## Owner preferences (persistent, set with /designer-vibe)\n${vibe.slice(0, 1200)}\nTreat these as standing user decisions: they rank as explicit user choices in the priority order.`;
 }
 
 function isEnabled(cwd = process.cwd()): boolean {
@@ -315,8 +354,11 @@ function doctorReport(cwd: string): string {
 }
 
 function looksLikeFrontendProject(cwd: string): boolean {
+  // A plain static site (index.html without a package.json) is frontend work
+  // too; skipping it would silently disable every delivery and taste check.
+  if (existsSync(join(cwd, "index.html"))) return true;
   return existsSync(join(cwd, "package.json")) &&
-    ["src", "app", "pages", "index.html"].some((entry) => existsSync(join(cwd, entry)));
+    ["src", "app", "pages"].some((entry) => existsSync(join(cwd, entry)));
 }
 
 // Directories that never count as user work for change detection: dependencies,
@@ -528,6 +570,9 @@ function runProcess(name: string, command: string, args: string[], cwd: string, 
 }
 
 function projectBuildCheck(cwd: string): CheckResult {
+  if (!existsSync(join(cwd, "package.json"))) {
+    return { name: "build", ok: true, skipped: "static site without a build system", output: "" };
+  }
   try {
     const parsed = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8")) as Record<string, unknown>;
     const scripts = asRecord(parsed.scripts);
@@ -554,6 +599,204 @@ function deliveryChecks(cwd: string, userFacts = ""): CheckResult[] {
 
 function truncate(text: string, max = 7000): string {
   return text.length <= max ? text : `${text.slice(0, max)}\n...[truncated ${text.length - max} characters]`;
+}
+
+// Validator rules that mark statistical-default (AI slop) output. They stay
+// warnings — never blockers — but their presence after passing delivery checks
+// grants one bounded self-repair continuation.
+const TASTE_RULES = new Set([
+  "reveal-hidden-content",
+  "ai-default-palette",
+  "gradient-imagery",
+  "gradient-heavy",
+  "missing-page-details",
+  "display-scale-timid",
+  "page-depth-thin",
+]);
+
+// Copy-side slop from the quality validator that joins the same review.
+const COPY_TASTE_RULES = new Set([
+  "remote-placeholder-asset",
+  "stat-tile-claim",
+  "contact-details-unverified",
+]);
+
+interface TasteItem {
+  rule: string;
+  detail: string;
+}
+
+function findScreenshots(cwd: string): string[] {
+  const results: string[] = [];
+  let budget = 2000;
+  const walk = (dir: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (budget-- <= 0) return;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!CHANGE_SKIP_DIRS.has(entry.name)) walk(full);
+      } else if (
+        /^screenshot[-_.][^/\\]*\.png$/i.test(entry.name) ||
+        (/\.png$/i.test(entry.name) && /(?:^|[/\\])screenshots$/i.test(dir))
+      ) {
+        results.push(full);
+      }
+    }
+  };
+  walk(cwd);
+  return results;
+}
+
+function parseValidatorJson(script: string, cwd: string, userFacts = ""): Record<string, unknown> | null {
+  const extraEnv: Record<string, string> = userFacts ? { DESIGNER_USER_FACTS: userFacts } : {};
+  const result = runProcess("validator-json", process.execPath, [script, "--json", "."], cwd, 45_000, extraEnv);
+  try {
+    return JSON.parse(result.output) as Record<string, unknown>;
+  } catch {
+    // Unparseable output: the plain-text delivery check already covered failures.
+    return null;
+  }
+}
+
+function reportIssues(report: Record<string, unknown> | null): Array<Record<string, unknown>> {
+  return Array.isArray(report?.issues) ? report.issues as Array<Record<string, unknown>> : [];
+}
+
+function tasteReview(cwd: string, userFacts = ""): TasteItem[] {
+  const items: TasteItem[] = [];
+
+  const layoutReport = parseValidatorJson(LAYOUT_SCRIPT, cwd);
+  const layoutIssues = reportIssues(layoutReport);
+  for (const rule of TASTE_RULES) {
+    const found = layoutIssues.find((issue) => issue.rule === rule);
+    if (found) items.push({ rule, detail: String(found.message ?? "") });
+  }
+
+  const substantive = layoutReport !== null &&
+    typeof layoutReport.filesScanned === "number" &&
+    layoutReport.filesScanned >= 3;
+  if (substantive && layoutReport?.designPresent === false) {
+    items.push({
+      rule: "design-contract-missing",
+      detail: "Substantive frontend work has no DESIGN.md. Write the visual-system contract (direction, color source, type, composition) and align the tokens with it.",
+    });
+  }
+  if (substantive && !existsSync(join(cwd, "PRODUCT.md"))) {
+    items.push({
+      rule: "product-facts-missing",
+      detail: "Substantive frontend work has no PRODUCT.md. Record the closed fact set (audience, capabilities, missing facts) so visible copy can be checked against it.",
+    });
+  }
+
+  const qualityIssues = reportIssues(parseValidatorJson(QUALITY_SCRIPT, cwd, userFacts));
+  for (const rule of COPY_TASTE_RULES) {
+    const found = qualityIssues.find((issue) => issue.rule === rule);
+    if (found) items.push({ rule, detail: `${String(found.message ?? "")} (e.g. ${JSON.stringify(found.value ?? "")})` });
+  }
+
+  // Screenshots captured before the last source edit are stale evidence.
+  const screenshots = findScreenshots(cwd);
+  if (screenshots.length > 0) {
+    let latestSource = 0;
+    let budget = 3000;
+    const scanSources = (dir: string): void => {
+      let entries;
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (budget-- <= 0) return;
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!CHANGE_SKIP_DIRS.has(entry.name)) scanSources(full);
+        } else if (/\.(?:tsx|jsx|ts|js|css|html|vue|svelte)$/i.test(entry.name)) {
+          try {
+            const mtime = statSync(full).mtimeMs;
+            if (mtime > latestSource) latestSource = mtime;
+          } catch {
+            // unreadable file: ignore
+          }
+        }
+      }
+    };
+    scanSources(cwd);
+    const staleShots = screenshots.filter((shot) => {
+      try {
+        return statSync(shot).mtimeMs < latestSource;
+      } catch {
+        return false;
+      }
+    });
+    if (latestSource > 0 && staleShots.length === screenshots.length) {
+      items.push({
+        rule: "stale-screenshots",
+        detail: "Every screenshot predates the latest source edit; the captures no longer show the shipped page. Recapture after the final change.",
+      });
+    }
+  }
+
+  for (const shot of screenshots) {
+    const analysis = analyzeScreenshot(shot) as {
+      error?: string;
+      fullPage?: boolean;
+      maxBlankRunFraction?: number;
+    };
+    if (!analysis.error && analysis.fullPage && (analysis.maxBlankRunFraction ?? 0) >= 0.3) {
+      items.push({
+        rule: "blank-screenshot-band",
+        detail: `${basename(shot)} has a contiguous blank band covering ${Math.round((analysis.maxBlankRunFraction ?? 0) * 100)}% of the page: content is hidden at initial paint or the layout is empty. Make every section legible without JavaScript or motion, then recapture.`,
+      });
+    }
+  }
+
+  // Optional model-backed visual judgment: when DESIGNER_REVIEW_MODEL names a
+  // vision-capable model, an actual look at the screenshots joins the same
+  // bounded repair loop. Failures degrade silently — the deterministic layer
+  // above already ran.
+  const reviewModel = process.env.DESIGNER_REVIEW_MODEL ?? "";
+  if (reviewModel && screenshots.length > 0) {
+    const reviewCommand = process.env.DESIGNER_REVIEW_CMD;
+    const reviewRun = reviewCommand
+      ? runProcess("visual-review", "sh", ["-c", reviewCommand], cwd, 300_000)
+      : runProcess("visual-review", process.execPath, [
+          join(SCRIPTS_ROOT, "design-review-cli.mjs"), "--target", ".", "--model", reviewModel, "--max-time", "240",
+        ], cwd, 320_000);
+    if (reviewRun.ok) {
+      try {
+        const parsed = JSON.parse(readFileSync(join(cwd, "design-review.json"), "utf8")) as {
+          verdict?: string;
+          review?: Record<string, { score?: number; reason?: string }>;
+          topFixes?: string[];
+        };
+        const zeroCategories = Object.entries(parsed.review ?? {})
+          .filter(([, entry]) => entry?.score === 0)
+          .map(([key, entry]) => `${key}: ${entry.reason ?? ""}`);
+        const weakVerdict = typeof parsed.verdict === "string" && /failed|weak/i.test(parsed.verdict);
+        if (weakVerdict || zeroCategories.length > 0) {
+          items.push({
+            rule: "visual-review",
+            detail: [
+              `A ${reviewModel} reviewer looked at the screenshots (verdict: ${parsed.verdict ?? "n/a"}).`,
+              ...zeroCategories.map((entry) => `problem — ${entry}`),
+              ...(parsed.topFixes ?? []).slice(0, 3).map((fix) => `fix — ${fix}`),
+            ].join(" "),
+          });
+        }
+      } catch {
+        // No readable review document: skip, deterministic checks stand alone.
+      }
+    }
+  }
+
+  return items;
 }
 
 export default function designerExtension(pi: ExtensionAPI): void {
@@ -586,6 +829,7 @@ export default function designerExtension(pi: ExtensionAPI): void {
   registry[INSTANCE_SYMBOL] = { module: MODULE_FILE, registeredAt: new Date().toISOString() };
 
   const validationAttempts = new Map<string, number>();
+  const tasteRepairAttempts = new Map<string, number>();
   const planRepairAttempts = new Map<string, number>();
   const userFactsByCwd = new Map<string, string>();
   // When each session's work began, used to detect real file changes.
@@ -609,6 +853,29 @@ export default function designerExtension(pi: ExtensionAPI): void {
           : "DESIGNER MODE OFF",
         "info",
       );
+      ctx.editor?.setText?.("");
+    },
+  });
+
+  pi.registerCommand("designer-vibe", {
+    description: "Set persistent design preferences for this project (e.g. 'always light, editorial, no dark themes'); no text shows/clears",
+    aliases: ["design-vibe"],
+    handler: (args, ctx) => {
+      const cwd = ctx.cwd ?? process.cwd();
+      const text = (typeof args === "string" ? args : Array.isArray(args) ? args.join(" ") : "").trim();
+      const vibes = readVibes();
+      if (text === "clear") {
+        delete vibes[cwd];
+        writeVibes(vibes);
+        ctx.ui?.notify?.("Designer vibe cleared for this project.", "info");
+      } else if (text) {
+        vibes[cwd] = text;
+        writeVibes(vibes);
+        writeTrace(cwd, "vibe_set", { chars: text.length });
+        ctx.ui?.notify?.("Designer vibe saved; it will be injected as a standing user decision.", "info");
+      } else {
+        ctx.ui?.notify?.(vibes[cwd] ? `Current vibe: ${vibes[cwd]}` : "No vibe set. Usage: /designer-vibe <preferences> | clear", "info");
+      }
       ctx.editor?.setText?.("");
     },
   });
@@ -648,7 +915,10 @@ export default function designerExtension(pi: ExtensionAPI): void {
       sessionStartByCwd.set(cwd, Date.now());
       sessionTokenByCwd.set(cwd, `${Date.now()}-${++sessionCounter}`);
     }
-    const prompt = asksForApprovalPlan(userPrompt) ? PLAN_ONLY_PROMPT : DESIGNER_PROMPT;
+    const base = asksForApprovalPlan(userPrompt) ? PLAN_ONLY_PROMPT : DESIGNER_PROMPT;
+    // The vibe lives inside the prompt markers so re-injection strips it too.
+    const vibe = vibeSection(cwd);
+    const prompt = vibe ? base.replace(/\n\[\/DESIGNER MODE\]$/, `${vibe}\n\n[/DESIGNER MODE]`) : base;
     const prompts = stripDesignerPrompt(normalizeSystemPrompt(asRecord(event).systemPrompt));
     writeTrace(cwd, "prompt_injected", {
       version: 5,
@@ -723,22 +993,57 @@ export default function designerExtension(pi: ExtensionAPI): void {
 
     if (failures.length === 0) {
       validationAttempts.delete(sessionId);
-      return;
+
+      // Delivery is objectively fine; now look for default-AI aesthetics.
+      // Taste never blocks, but detected slop earns one self-repair pass.
+      const tasteItems = tasteReview(cwd, userFactsByCwd.get(cwd) ?? "");
+      writeTrace(cwd, tasteItems.length === 0 ? "taste_review_passed" : "taste_review_flagged", {
+        sessionId,
+        rules: tasteItems.map((item) => item.rule),
+      });
+      if (tasteItems.length === 0) {
+        tasteRepairAttempts.delete(sessionId);
+        return;
+      }
+      // Two bounded repair passes: real runs show the flagged set shrinking
+      // per pass (4 rules -> 2 rules), so a second pass usually clears it.
+      const tasteAttempt = (tasteRepairAttempts.get(sessionId) ?? 0) + 1;
+      tasteRepairAttempts.set(sessionId, tasteAttempt);
+      if (tasteAttempt >= 3) return;
+      return {
+        continue: true,
+        additionalContext: truncate([
+          "[DESIGNER TASTE REVIEW]",
+          "Delivery checks passed, but the result shows statistical-default (AI slop) patterns. Fix the underlying causes below without changing the user's scope, rerun the checks, and recapture affected screenshots.",
+          "",
+          ...tasteItems.map((item) => `- ${item.rule}: ${item.detail}`),
+          "",
+          "Escape defaults with product specificity (a real product view, honest diagram, or material-derived palette) — not with added decoration.",
+          "[/DESIGNER TASTE REVIEW]",
+        ].join("\n")),
+      };
     }
 
     // One continuation gives the agent a chance to repair. The second failure
     // is reported by the normal assistant response instead of creating a loop.
     if (attempt >= 2) return;
 
+    // Piggyback taste findings on the same repair turn: a session that ends in
+    // delivery failure would otherwise ship with its taste problems unreviewed.
+    const failureTasteItems = tasteReview(cwd, userFactsByCwd.get(cwd) ?? "");
     return {
       continue: true,
       additionalContext: truncate([
         "[DESIGNER DELIVERY CHECKS FAILED]",
         "Fix the true blockers below, rerun the checks, and report any remaining limitation.",
+        "For an unsupported numeric or commercial claim: remove it or replace it with the user's own facts. A demo label or an EVIDENCE.md row you wrote yourself does not authorize a claim the user never supplied.",
         "Warnings do not require cosmetic churn.",
         "If visible output changes, repeat browser QA and refresh affected screenshots.",
         "",
         ...failures.map((failure) => `## ${failure.name}\n${failure.output || "failed without output"}`),
+        ...(failureTasteItems.length > 0
+          ? ["", "## taste review (fix in the same pass)", ...failureTasteItems.map((item) => `- ${item.rule}: ${item.detail}`)]
+          : []),
         "[/DESIGNER DELIVERY CHECKS FAILED]",
       ].join("\n")),
     };

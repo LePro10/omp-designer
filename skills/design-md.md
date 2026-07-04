@@ -102,3 +102,8 @@ established mechanism rather than forcing a new one.
 Do not make every content group a floating rounded card. Container treatment must
 communicate grouping, hierarchy, interaction, or state. Plain typography,
 dividers, tables, diagrams, and continuous canvases are valid structures.
+
+Text placed over photography or gradients needs a guaranteed contrast
+mechanism — a scrim, a solid panel, or a measured safe region of the image.
+Never position copy over an uncontrolled image area and hope. Check the
+narrow viewport too: text and imagery that coexist at 1280px collide at 375px.

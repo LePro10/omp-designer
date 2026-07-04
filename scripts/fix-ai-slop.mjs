@@ -57,7 +57,9 @@ function stripComments(content) {
 
 function addCandidate(candidates, seen, text, index, content) {
   const value = text.replace(/\s+/g, " ").trim();
-  if (value.length < 2 || !/[A-Za-zÀ-ž]{2}/.test(value)) return;
+  // Copy needs two letters OR a digit: "10x", "98%", "50k+" are visible claims
+  // even though they contain at most one letter.
+  if (value.length < 2 || !(/[A-Za-zÀ-ž]{2}/.test(value) || /\d/.test(value))) return;
   const key = `${index}:${value}`;
   if (seen.has(key)) return;
   seen.add(key);
@@ -87,7 +89,16 @@ function visibleCopyCandidates(content) {
     const value = match[2];
     if (/(?:className|class|href|src|import|from|require|fontFamily)\s*[:=]?\s*$/i.test(prefix)) continue;
     if (/^(?:https?:|\/|\.\/|#|[a-z-]+:)/i.test(value.trim())) continue;
-    if (!/\s/.test(value) && value.length < 24) continue;
+    // Stat tokens ("10x", "98%", "50k+") behind copy-ish object keys are
+    // visible claims even without whitespace: { value: "10x", label: "..." }.
+    const statKeyed = /(?:value|stat|metric|number|count|figure|kpi|amount)\s*[:=]\s*$/i.test(prefix) &&
+      /^[~≈]?\d[\d,.]*\s?(?:%|[x×]|\+|[km]\+?)$/i.test(value.trim());
+    if (!statKeyed && !/\s/.test(value) && value.length < 24) continue;
+    // CSS value expressions ("translate(-50%, -50%)", "0 4px 12px rgba(...)")
+    // are implementation strings, not visible copy claims.
+    const cssValueLike = /^(?:-?[\d.]+(?:px|r?em|vh|vw|vmin|vmax|%|m?s|deg|fr|ch|ex)?[\s,/]*|(?:translate|scale|rotate|skew)[XYZ]?\([^)]*\)[\s,]*|(?:calc|var|min|max|clamp|rgba?|hsla?|url|cubic-bezier|steps)\([^)]*\)[\s,]*|[a-z-]+-gradient\([^)]*\)[\s,]*)+$/i
+      .test(value.trim());
+    if (cssValueLike && !statKeyed) continue;
     addCandidate(candidates, seen, value, index, cleaned);
   }
 
@@ -148,8 +159,10 @@ const FACT_PATTERNS = [
   { rule: "unsupported-multiplier", regex: /\b\d+(?:\.\d+)?\s?[x×]\b/gi },
   {
     rule: "unsupported-count",
-    regex: /\b\d[\d,.]*(?:\+)?\s+(?:users|customers|teams|companies|orders|projects|seconds?|minutes?|hours?|days?|weeks?|months?|years?|countries|awards)\b/gi,
+    regex: /\b\d[\d,.]*\s?(?:[km]\+?|\+)?\s+(?:active\s+)?(?:users|customers|teams|companies|orders|projects|seconds?|minutes?|hours?|days?|weeks?|months?|years?|countries|awards|downloads|installs|members|subscribers|developers|reviews|stars)\b/gi,
   },
+  // "50k+" / "1M+" style audience counts, with or without a following noun.
+  { rule: "unsupported-count", regex: /\b\d[\d,.]*\s?[km]\+/gi },
   {
     rule: "unsupported-count",
     regex: /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b/gi,
@@ -276,6 +289,23 @@ for (const file of files) {
       );
     }
 
+    // Model-glitch script mixing: CJK/Hangul/Cyrillic fragments embedded in
+    // otherwise-Latin copy are a strong generated-text tell.
+    {
+      const latinLetters = (candidate.text.match(/[A-Za-zÀ-ž]/g) ?? []).length;
+      const foreign = candidate.text.match(/[一-鿿぀-ヿ가-힯Ѐ-ӿ]+/g);
+      if (foreign && latinLetters >= foreign.join("").length * 2) {
+        push(
+          "blocker",
+          rel,
+          candidate,
+          "mixed-script-copy",
+          foreign.join(" "),
+          "Copy mixes another script into Latin text mid-sentence; this reads as a generation glitch. Rewrite the sentence in one language.",
+        );
+      }
+    }
+
     if (/[—–]/.test(candidate.text)) {
       push(
         "warning",
@@ -298,6 +328,37 @@ for (const file of files) {
       );
     }
 
+    // Invented contact details look real to a visitor and cannot be honored.
+    // Scanned only in visible copy, so SVG coordinates and dates do not match.
+    for (const match of candidate.text.matchAll(/(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)[\s.-]?)?\d{2,4}(?:[\s.-]\d{2,4}){2,4}/g)) {
+      const token = match[0].trim();
+      const digits = token.replace(/\D/g, "");
+      if (digits.length < 8 || digits.length > 15) continue;
+      if (!/^[+(]/.test(token) && !/\bphone|call|tel\b/i.test(candidate.text)) continue;
+      if (isSupported(token) || isSupported(digits)) continue;
+      push(
+        "warning",
+        rel,
+        candidate,
+        "contact-details-unverified",
+        token,
+        "A phone number appears in the copy but was not supplied by the user; visitors will dial it. Use a supplied number or an explicit placeholder.",
+      );
+    }
+    for (const match of candidate.text.matchAll(/\b[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b/gi)) {
+      const address = match[0];
+      if (/@(?:example\.(?:com|org)|test\.)/i.test(address)) continue;
+      if (isSupported(address)) continue;
+      push(
+        "warning",
+        rel,
+        candidate,
+        "contact-details-unverified",
+        address,
+        "An email address appears in the copy but was not supplied by the user. Use a supplied address or an explicit placeholder.",
+      );
+    }
+
     for (const word of BUZZWORDS) {
       const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
       if (regex.test(candidate.text)) {
@@ -311,6 +372,30 @@ for (const file of files) {
         );
       }
     }
+  }
+
+  // Stat tiles split the number and its label across elements ("<div>12</div>
+  // <div>Farm partners</div>"), evading the unit-word patterns above. A bare
+  // numeric text node (>= 10, or any value with a %/x/+/k/M suffix) followed
+  // closely by a short label reads as a metrics row and needs a source.
+  for (const match of content.matchAll(/>\s*([~≈]?\d[\d,.]*\s?(?:%|[x×]|\+|[km]\+?)?)\s*</g)) {
+    const token = match[1].trim();
+    const bareNumber = /^\d[\d,.]*$/.test(token);
+    if (/^0\d/.test(token)) continue; // "01" step markers
+    if (bareNumber && Number.parseFloat(token.replace(/,/g, "")) < 10) continue;
+    const tail = content.slice((match.index ?? 0) + match[0].length, (match.index ?? 0) + match[0].length + 150);
+    const label = tail.match(/>\s*([A-Za-zÀ-ž][^<>{}]{1,40})\s*</);
+    if (!label || label[1].trim().split(/\s+/).length > 4) continue;
+    const claim = `${token} ${label[1].trim()}`;
+    if (isSupported(claim) || isSupported(token)) continue;
+    push(
+      "warning",
+      rel,
+      { line: lineAt(content, match.index ?? 0) },
+      "stat-tile-claim",
+      claim,
+      "A bare numeric tile next to a label reads as a metric; verify the number is user-supplied or remove the stats row.",
+    );
   }
 
   for (const match of content.matchAll(/<a\b[^>]*\bhref\s*=\s*["']#["'][^>]*>([\s\S]*?)<\/a>/gi)) {
@@ -352,9 +437,32 @@ for (const file of files) {
         line: lineAt(content, content.indexOf(host)),
         rule: "remote-placeholder-asset",
         value: host,
-        message: "Final work should use supplied, generated, or deliberately licensed assets.",
+        message: "Do not hotlink stock hosts. Download free-license images into the project (assets/), record source and license in EVIDENCE.md, and reference the local files.",
       });
     }
+  }
+}
+
+// Emoji doing the work of icons is a generated-UI tell; a single accent is
+// fine, a system of them is not.
+{
+  const emojiRe = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
+  const distinctEmoji = new Set();
+  for (const file of files) {
+    const content = readFileSync(file, "utf8");
+    for (const candidate of visibleCopyCandidates(content)) {
+      for (const match of candidate.text.matchAll(emojiRe)) distinctEmoji.add(match[0]);
+    }
+  }
+  if (distinctEmoji.size >= 3) {
+    issues.push({
+      severity: "warning",
+      file: "(project)",
+      line: 0,
+      rule: "emoji-as-interface",
+      value: [...distinctEmoji].slice(0, 6).join(" "),
+      message: "Multiple distinct emoji act as interface icons; use one icon family (inline SVG) or typographic markers unless emoji are part of the brand.",
+    });
   }
 }
 

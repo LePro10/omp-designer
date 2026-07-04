@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KINEMATICA — Precision Motion Systems</title>
+<meta name="description" content="KINEMATICA manufactures precision robotic motion systems for electronics micro-assembly. The KT-7 six-axis articulating arm.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="site-header">
+  <div class="header-inner container">
+    <span class="logo">KINEMATICA</span>
+    <nav aria-label="Page sections">
+      <a href="#product">Product</a>
+      <a href="#specs">Specifications</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-label="Product introduction">
+  <div class="hero-inner container">
+    <div class="hero-panel" aria-label="Robot status display">
+      <div class="panel-header">
+        <span class="panel-dot" style="background:var(--status-green)"></span>
+        <span class="panel-label">KT-7 CONTROLLER</span>
+        <span class="panel-id">UNIT 042 — ONLINE</span>
+      </div>
+      <div class="panel-body">
+        <div class="status-row status-row-wide">
+          <span class="status-label">SYSTEM</span>
+          <span class="status-value status-ok">OPERATIONAL</span>
+        </div>
+        <div class="joint-grid">
+          <div class="joint-cell">
+            <span class="joint-label">J1</span>
+            <span class="joint-value" id="j1">+142.7°</span>
+          </div>
+          <div class="joint-cell">
+            <span class="joint-label">J2</span>
+            <span class="joint-value" id="j2">−38.2°</span>
+          </div>
+          <div class="joint-cell">
+            <span class="joint-label">J3</span>
+            <span class="joint-value" id="j3">+89.5°</span>
+          </div>
+          <div class="joint-cell">
+            <span class="joint-label">J4</span>
+            <span class="joint-value" id="j4">−12.1°</span>
+          </div>
+          <div class="joint-cell">
+            <span class="joint-label">J5</span>
+            <span class="joint-value" id="j5">+67.4°</span>
+          </div>
+          <div class="joint-cell">
+            <span class="joint-label">J6</span>
+            <span class="joint-value" id="j6">+180.0°</span>
+          </div>
+        </div>
+        <div class="status-grid">
+          <div class="stat-item">
+            <span class="stat-indicator" style="background:var(--status-green)"></span>
+            <span class="stat-name">SERVO</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-indicator" style="background:var(--status-green)"></span>
+            <span class="stat-name">VISION</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-indicator" style="background:var(--status-green)"></span>
+            <span class="stat-name">GRIPPER</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-indicator" style="background:var(--status-amber)"></span>
+            <span class="stat-name">CALIB</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-indicator" style="background:var(--status-green)"></span>
+            <span class="stat-name">E-STOP</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-indicator" style="background:var(--status-green)"></span>
+            <span class="stat-name">NET</span>
+          </div>
+        </div>
+        <div class="data-row">
+          <span class="status-label">CYCLE</span>
+          <span class="mono">00:01.42</span>
+          <span class="status-label">PARTS</span>
+          <span class="mono">14,827</span>
+          <span class="demo-badge">DEMO</span>
+          <span class="status-label">TEMP</span>
+          <span class="mono">46.2 °C</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-text">
+      <p class="section-label">KT-7 ARTICULATING ARM</p>
+      <h1>Precision that<br>forgives nothing.</h1>
+      <p class="hero-sub">Six-axis micro-assembly with ±0.8 µm repeatability. Built for the tolerances that separate a working board from a reject pile.</p>
+      <div class="hero-actions">
+        <a href="#specs" class="btn btn-primary">View specifications</a>
+        <a href="#contact" class="btn btn-outline">Request engineering brief</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="philosophy" id="product" aria-label="Engineering philosophy">
+  <div class="container narrow">
+    <p class="section-label">PHILOSOPHY</p>
+    <h2>Every micron is a decision.</h2>
+    <div class="philosophy-body">
+      <p>Robotic precision is not a spec sheet number — it is the sum of mechanical stiffness, thermal stability, encoder resolution, and control-loop latency. The KT-7 was designed from the spindle up for SMT and semiconductor applications where a 0.1&deg; temperature shift means a rejected component.</p>
+      <p>Cast from aged cast iron for vibration damping. Direct-drive joints with zero backlash. A kinematic model compensates for thermal expansion across the operating range. The result is an arm that holds position through a full production shift without re-homing.</p>
+    </div>
+  </div>
+</section>
+
+<section class="specifications" id="specs" aria-label="Technical specifications">
+  <div class="container">
+    <p class="section-label">SPECIFICATIONS</p>
+    <h2>KT-7 parameters</h2>
+    <div class="spec-table" role="table" aria-label="KT-7 technical specifications">
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Axes</span>
+        <span class="spec-def" role="cell">6 (J1–J6)</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Reach radius</span>
+        <span class="spec-def" role="cell">400 mm</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Payload</span>
+        <span class="spec-def" role="cell">2.5 kg</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Repeatability</span>
+        <span class="spec-def" role="cell">±0.8 µm (target spec)</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Max reach speed</span>
+        <span class="spec-def" role="cell">2.4 m/s</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Control interface</span>
+        <span class="spec-def" role="cell">EtherCAT, Modbus TCP</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Encoder type</span>
+        <span class="spec-def" role="cell">Absolute 23-bit</span>
+      </div>
+      <div class="spec-row" role="row">
+        <span class="spec-term" role="cell">Weight</span>
+        <span class="spec-def" role="cell">28 kg</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta" id="contact" aria-label="Contact">
+  <div class="container cta-inner">
+    <h2>Need an arm that holds position?</h2>
+    <p>We provide detailed engineering drawings, cycle-time simulations, and sample-cell layouts before any commitment.</p>
+    <p class="cta-contact">engineering@kinematica.io</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <span class="logo">KINEMATICA</span>
+    <span class="footer-note">Precision Motion Systems</span>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 The runtime should improve design work without becoming the work. It therefore:
 
 - injects one concise prompt,
-- exposes four package-relative skills,
+- exposes five package-relative skills,
 - never gates ordinary tools,
 - never mutates MCP configuration,
 - keeps project state per working directory,
@@ -27,7 +27,7 @@ before_agent_start
     └─ record session start (baseline for change detection + fallback id)
     │
 resources_discover
-    └─ expose four conditional skills
+    └─ expose five conditional skills
     │
 agent work
     ├─ local inspection
@@ -93,6 +93,7 @@ migration. Automation can override state with `OMP_DESIGNER_MODE`.
 | --- | --- |
 | designer-master | substantive design work |
 | design-md | new visual language or major redesign |
+| expression | choosing the ambition dials and the page's signature moment |
 | animate | meaningful motion is requested or present |
 | review-skill | delivery review |
 
@@ -137,7 +138,7 @@ harness is manual and needs model credentials; it is not part of `npm test`.
 `scripts/__tests__/host-bridge.test.ts` and `scripts/e2e-smoke.mjs` provide the
 automated adapter evidence. They simulate the documented OMP/Pi host event
 contract against the real adapter modules — registration, one-time prompt
-injection, four-skill discovery, plan-continuation exactness, delivery-check
+injection, five-skill discovery, plan-continuation exactness, delivery-check
 gating, duplicate-load, and the OMP/Pi capability difference. This is simulated
 evidence: it does not prove a live OMP host emits identical event shapes, and it
 does not drive a real model. `e2e-smoke.mjs --real-omp` reports `SKIPPED` (never

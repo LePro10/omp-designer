@@ -164,6 +164,17 @@ export function extractBehaviorSignals({ projectDir, userPrompt = "", quality = 
       ? signal((composition.signals?.length ?? 0) === 0, "heuristic", "equal-grid / rounded-surface proxy")
       : signal("n/a", "unavailable", "run with composition signals or human review"),
 
+    // Default-AI aesthetics, straight from the layout validator's taste rules.
+    contentVisibleAtInitialPaint: layout
+      ? (hasRule(layout, "reveal-hidden-content") ? signal(false, "automatic") : signal(true, "heuristic", "no hidden-reveal pattern detected"))
+      : signal("n/a", "unavailable"),
+    avoidedDefaultAiPalette: layout
+      ? signal(!hasRule(layout, "ai-default-palette"), "automatic")
+      : signal("n/a", "unavailable"),
+    avoidedGradientImagery: layout
+      ? signal(!hasRule(layout, "gradient-imagery"), "automatic")
+      : signal("n/a", "unavailable"),
+
     // Intent handling that static artifacts cannot prove.
     surpriseMeDelegated: signal(delegatesArtDirection(userPrompt), "automatic"),
     honoredSurpriseMeWithoutExtraQuestions: delegatesArtDirection(userPrompt)
