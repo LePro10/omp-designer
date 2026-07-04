@@ -3,7 +3,7 @@
  * Documentation consistency contract.
  *
  * String-based guards (no generator) that keep the docs aligned with the current
- * v5 architecture: four skills, no skill-read hard gate, honest OMP/Pi
+ * v5 architecture: five skills, no skill-read hard gate, honest OMP/Pi
  * difference, simulated-vs-real E2E clarity, and secret hygiene.
  */
 import assert from "node:assert/strict";
@@ -44,7 +44,7 @@ const checks = [
   ["architecture notes real-omp SKIPPED not PASS", /SKIPPED[\s\S]{0,15}never[\s\S]{0,15}PASS/i.test(architecture)],
 
   // Four skills present in the primary docs.
-  ["README mentions four skills", /four conditional skills/i.test(readme)],
+  ["README mentions five skills", /five conditional skills/i.test(readme)],
   ["architecture skills table lists four skills", /designer-master[\s\S]*design-md[\s\S]*animate[\s\S]*review-skill/i.test(architecture)],
 
   // Secret hygiene.

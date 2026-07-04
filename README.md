@@ -4,8 +4,11 @@ Focused UI/UX workflow for [Pi](https://pi.dev) and
 [oh-my-pi](https://github.com/can1357/oh-my-pi).
 
 Version 5 removes the mandatory 12-skill gate and MCP state mutation. It provides
-four conditional skills, a concise system prompt, evidence-aware validators, and
-a reproducible real-agent comparison harness.
+five conditional skills (core workflow, visual system, expression toolkit,
+motion, delivery review), a concise system prompt with an anti-slop and
+art-direction core, evidence-aware validators, screenshot content analysis, a
+bounded taste-repair loop, an optional model-backed visual reviewer, and a
+reproducible real-agent comparison harness.
 
 ## Install
 
@@ -95,10 +98,18 @@ The mode is stored per project. `OMP_DESIGNER_MODE=1` and
 
 ## What v5 loads
 
-- `designer-master`: proportional product-design workflow
+- `designer-master`: proportional product-design workflow, art direction,
+  human-taste marks, named-reference protocol
 - `design-md`: visual-system contract for new pages and redesigns
+- `expression`: ambition dials, signature-moment menu, and working recipes
+  (scroll scenes, rails, kinetic type, texture, load choreography)
 - `animate`: optional motion guidance
-- `review-skill`: delivery and browser review
+- `review-skill`: delivery and browser review, substitutability test
+
+Supporting assets: `data/gallery/` (three complete reference pages that meet
+the system's bar), `data/qa/overlap-check.js` (browser snippet reporting
+overlapping or clipped text), and `docs/ai-slop.md` (the canonical slop
+definition and taxonomy).
 
 Skills remain package-relative. There is no managed-skill copy and no requirement
 to read every skill before using tools. Skill reads are not technically enforced;
@@ -108,15 +119,16 @@ consumption is not directly observable.
 
 ## Hosts: OMP and Pi
 
-The two adapters share prompt injection, four-skill discovery, plan-intent
+The two adapters share prompt injection, five-skill discovery, plan-intent
 detection, and one bounded plan-only continuation. They are not at parity:
 
 | Capability | OMP (`extension/index.ts`) | Pi (`extensions/designer.ts`) |
 | --- | --- | --- |
 | Focused prompt injection | yes | yes |
-| Four-skill `resources_discover` | yes | yes |
+| Five-skill `resources_discover` | yes | yes |
 | Plan-intent detection + bounded plan-only continuation | yes | yes |
 | Post-execution delivery checks (quality/layout/build on `session_stop`) | yes | no |
+| Bounded taste review (slop rules, blank screenshot bands, optional visual reviewer) | yes | no |
 | Trace events under `~/.omp/agent/designer-traces` | yes | no |
 | Tool interception / skill-read hard gate | none | none |
 | MCP mutation | none | none |
@@ -257,8 +269,33 @@ double-load.
 ## Commands
 
 - `/designer`: toggle for the current working directory
+- `/designer-vibe <text>`: persistent per-project design preferences, injected
+  as standing user decisions (`/designer-vibe clear` resets; no text shows the
+  current value)
 - `/designer-doctor`: inspect source path, duplicate-install risk, runtime assets,
   and MCP configuration
+
+## Model-backed visual review
+
+`npm run review:visual -- --target <project>` has a vision-capable model look
+at the project's screenshots and fill a structured design rubric (verdict,
+the one memorable thing, top fixes), saved as `design-review.json`.
+
+- Default reviewer: `opencode-go/minimax-m3:high`. If you do not have access
+  to it, set any vision-capable model with `--model` or
+  `DESIGNER_REVIEW_MODEL` (see the images column in `omp models`), or use
+  `--via api` with `DESIGNER_REVIEW_BASE_URL` for any OpenAI-compatible local
+  endpoint such as LM Studio.
+- A vision-blind model is rejected honestly (`cannot view the images`), never
+  trusted with a rubric it did not see.
+- The eval harness runs this reviewer by default (`--no-review` skips,
+  `--review-model` overrides) and attaches the judgment to its reports.
+- At runtime, setting `DESIGNER_REVIEW_MODEL` makes the `session_stop` taste
+  review feed the reviewer's zero-scored categories and top fixes into the
+  bounded repair loop.
+
+`npm run gallery` builds `test-output/gallery.html`: every run's screenshots,
+scores, slop-rule hits, and reviewer verdicts side by side.
 
 ## Runtime structure
 
@@ -266,13 +303,18 @@ double-load.
 extension/index.ts               omp extension (prompt, plan checks, delivery backstop)
 extensions/designer.ts           Pi extension (prompt + plan checks, no backstop)
 shared/security.mjs              shared secret patterns for redaction and release scan
-skills/                          four conditional skills
+skills/                          five conditional skills
 data/ui-ux-pro-max/              palette and typography search data
 scripts/fix-ai-slop.mjs          evidence-aware copy validator
 scripts/analyze-layout.mjs       proportional layout/contrast validator
 scripts/audit-data.mjs           CSV integrity and contrast audit
 scripts/audit-trace.mjs          duplicate-load and delivery trace audit
-scripts/real-agent-eval.mjs      manual real-model comparison harness
+scripts/real-agent-eval.mjs      manual real-model comparison harness (--suite for the normal-prompt corpus)
+scripts/design-review-cli.mjs    model-backed visual review (rubric from screenshots)
+scripts/build-gallery.mjs        local gallery of all runs (test-output/gallery.html)
+shared/screenshot-analysis.mjs   PNG decoder + blank-band metrics
+data/gallery/                    three golden reference pages
+data/qa/overlap-check.js         browser overlap/clipping QA snippet
 scripts/e2e-smoke.mjs            simulated host-bridge smoke runner (optional --real-omp)
 scripts/check-release.mjs        packed-artifact and repo-wide secret release gate
 scripts/cleanup-artifacts.mjs    dry-run-first cleanup for generated test-output

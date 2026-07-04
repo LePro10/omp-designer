@@ -35,7 +35,7 @@ afterAll(() => {
 describe("v5 extension", () => {
   test("registers once without a tool gate", () => {
     module.default(api);
-    expect(commands.map((command) => command.name)).toEqual(["designer", "designer-doctor"]);
+    expect(commands.map((command) => command.name)).toEqual(["designer", "designer-vibe", "designer-doctor"]);
     expect(handlers.has("tool_call")).toBe(false);
     expect(handlers.has("tool_result")).toBe(false);
   });
@@ -44,7 +44,7 @@ describe("v5 extension", () => {
     const handler = handlers.get("resources_discover")?.[0];
     expect(handler).toBeDefined();
     const result = handler?.({}, { cwd: process.cwd() }) as { skillPaths: string[] };
-    expect(result.skillPaths).toHaveLength(4);
+    expect(result.skillPaths).toHaveLength(5);
     expect(result.skillPaths.every((path) => path.startsWith(module.PACKAGE_ROOT))).toBe(true);
   });
 
@@ -75,6 +75,30 @@ describe("v5 extension", () => {
     expect(prompt).toContain("plan-only turn");
     expect(prompt).not.toContain("review-skill.md");
     expect(prompt).not.toContain("For substantive frontend work, run:");
+  });
+
+  test("designer-vibe persists inside the prompt markers and clears again", () => {
+    const cwd = "/tmp/omp-designer-vibe-test";
+    const vibe = commands.find((command) => command.name === "designer-vibe");
+    expect(vibe).toBeDefined();
+    const handler = vibe?.options.handler as (args: unknown, ctx: Record<string, unknown>) => void;
+    try {
+      handler("always light, editorial, never dark themes", { cwd });
+      const start = handlers.get("before_agent_start")?.[0];
+      const result = start?.({ prompt: "build a page", systemPrompt: ["base"] }, { cwd }) as { systemPrompt: string[] };
+      const prompt = result.systemPrompt.at(-1) ?? "";
+      expect(prompt).toContain("Owner preferences");
+      expect(prompt).toContain("never dark themes");
+      // The vibe sits inside the markers, so re-injection replaces, not stacks.
+      expect(prompt.indexOf("[/DESIGNER MODE]")).toBeGreaterThan(prompt.indexOf("never dark themes"));
+      const again = start?.({ prompt: "build a page", systemPrompt: result.systemPrompt }, { cwd }) as { systemPrompt: string[] };
+      expect(again.systemPrompt.join("").match(/Owner preferences/g)).toHaveLength(1);
+    } finally {
+      handler("clear", { cwd });
+    }
+    const start = handlers.get("before_agent_start")?.[0];
+    const cleared = start?.({ prompt: "build a page", systemPrompt: ["base"] }, { cwd }) as { systemPrompt: string[] };
+    expect(cleared.systemPrompt.at(-1) ?? "").not.toContain("Owner preferences");
   });
 
   test("replaces an existing v5 prompt instead of stacking it", () => {

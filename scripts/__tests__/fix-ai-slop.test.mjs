@@ -311,6 +311,128 @@ test("remote placeholder asset is warning only", () => {
   }
 });
 
+test("stat tokens behind object keys block without a source", () => {
+  const dir = fixture({
+    "src/stats.js": "export const stats = [{ value: \"10x\", label: \"Faster Output\" }, { value: \"98%\", label: \"Task Accuracy\" }, { value: \"50k+\", label: \"Active Users\" }];\n",
+  });
+  try {
+    const result = run(dir, { DESIGNER_USER_FACTS: "make a stunning website for an AI product" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /unsupported-multiplier.*"10x"/);
+    assert.match(result.stdout, /unsupported-percentage.*"98%"/);
+    assert.match(result.stdout, /unsupported-count.*"50k\+"/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("k+ audience counts in text nodes block", () => {
+  const dir = fixture({
+    "index.html": "<html><body><p>Join 50k+ active users today.</p></body></html>",
+  });
+  try {
+    const result = run(dir, { DESIGNER_USER_FACTS: "build a site" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /unsupported-count/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("split stat tiles warn, step markers do not", () => {
+  const dir = fixture({
+    "index.html": [
+      "<html><body>",
+      "<div class=\"stat\"><span>12</span><span>Farm partners</span></div>",
+      "<div class=\"step\"><span>01</span><span>Sourcing</span></div>",
+      "<div class=\"step\"><span>4</span><span>Origins</span></div>",
+      "</body></html>",
+    ].join("\n"),
+  });
+  try {
+    const result = run(dir, { DESIGNER_USER_FACTS: "make a site for my coffee brand" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /stat-tile-claim.*12 Farm partners/);
+    assert.doesNotMatch(result.stdout, /stat-tile-claim.*01/);
+    assert.doesNotMatch(result.stdout, /stat-tile-claim.*4 Origins/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("invented phone and email warn; supplied and placeholder ones pass", () => {
+  const dir = fixture({
+    "index.html": [
+      "<html><body>",
+      "<p>Call us on +44 20 7491 1600 or write to studio@grainandbeam.com.</p>",
+      "<p>Support: help@example.com</p>",
+      "<svg viewBox=\"0 0 1600 900\"><polygon points=\"10 20 30 40 50 60\"/></svg>",
+      "</body></html>",
+    ].join("\n"),
+  });
+  try {
+    const unsourced = run(dir, { DESIGNER_USER_FACTS: "surprise me with a website for a furniture studio" });
+    assert.equal(unsourced.status, 0, unsourced.stdout + unsourced.stderr);
+    assert.match(unsourced.stdout, /contact-details-unverified.*\+44 20 7491 1600/);
+    assert.match(unsourced.stdout, /contact-details-unverified.*studio@grainandbeam\.com/);
+    assert.doesNotMatch(unsourced.stdout, /contact-details-unverified.*example\.com/);
+    assert.doesNotMatch(unsourced.stdout, /contact-details-unverified.*10 20 30/);
+
+    const sourced = run(dir, { DESIGNER_USER_FACTS: "my studio: phone +44 20 7491 1600, mail studio@grainandbeam.com" });
+    assert.doesNotMatch(sourced.stdout, /contact-details-unverified/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CJK leakage inside Latin copy blocks; a genuinely non-Latin page passes", () => {
+  const glitch = fixture({
+    "index.html": "<html><body><p>No synthetic fragrance, no不必要的 extras, just honest skincare.</p></body></html>",
+  });
+  const chinese = fixture({
+    "index.html": "<html><body><p>纯净配方，不含香精，成分透明。</p></body></html>",
+  });
+  try {
+    const bad = run(glitch, { DESIGNER_USER_FACTS: "build a site" });
+    assert.equal(bad.status, 1, bad.stdout + bad.stderr);
+    assert.match(bad.stdout, /mixed-script-copy/);
+
+    const ok = run(chinese, { DESIGNER_USER_FACTS: "build a site" });
+    assert.doesNotMatch(ok.stdout, /mixed-script-copy/);
+  } finally {
+    rmSync(glitch, { recursive: true, force: true });
+    rmSync(chinese, { recursive: true, force: true });
+  }
+});
+
+test("emoji icon systems warn; a single accent emoji passes", () => {
+  const system = fixture({
+    "index.html": "<html><body><p>🚀 Fast</p><p>🔒 Secure</p><p>⚡ Powerful</p></body></html>",
+  });
+  const accent = fixture({
+    "index.html": "<html><body><p>Fresh croissants every morning 🥐</p></body></html>",
+  });
+  try {
+    assert.match(run(system, { DESIGNER_USER_FACTS: "x" }).stdout, /emoji-as-interface/);
+    assert.doesNotMatch(run(accent, { DESIGNER_USER_FACTS: "x" }).stdout, /emoji-as-interface/);
+  } finally {
+    rmSync(system, { recursive: true, force: true });
+    rmSync(accent, { recursive: true, force: true });
+  }
+});
+
+test("CSS-in-JS transform percentages do not become claims", () => {
+  const dir = fixture({
+    "src/anim.js": "el.style.transform = \"translate(-50%, -50%)\"; el.style.width = \"100%\";\n",
+  });
+  try {
+    const result = run(dir, { DESIGNER_USER_FACTS: "build a site" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 let failed = 0;
 for (const { name, fn } of cases) {
   try {

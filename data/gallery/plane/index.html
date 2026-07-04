@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLANE — Architecture criticism for the built world</title>
+<meta name="description" content="PLANE is an independent magazine devoted to architecture criticism, urbanism, and the built environment. Vol. IV, No. 12.">
+<meta name="theme-color" content="#f4f1eb">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='2' y='6' width='28' height='20' fill='none' stroke='%23a84c3e' stroke-width='2'/><rect x='4' y='8' width='24' height='2' fill='%23a84c3e'/><rect x='4' y='12' width='10' height='2' fill='%23a84c3e'/><rect x='16' y='12' width='12' height='2' fill='%23a84c3e'/><rect x='4' y='16' width='6' height='2' fill='%23a84c3e'/><rect x='12' y='16' width='8' height='2' fill='%23a84c3e'/><rect x='22' y='16' width='6' height='2' fill='%23a84c3e'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f4f1eb;
+  --fg: #1a1814;
+  --surface: #ede8de;
+  --accent: #a84c3e;
+  --accent-fg: #f4f1eb;
+  --secondary: #4a5d6e;
+  --muted: #b5aba0;
+  --border: #d4cec4;
+  --focus: #a84c3e;
+  --selection: #a84c3e30;
+  --radius: 0;
+  --max-width: 1280px;
+  --gutter: 24px;
+  --pad: 40px;
+  --section-py: clamp(48px, 6vw, 80px);
+
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --body-size: clamp(1rem, 1.1vw, 1.125rem);
+  --body-leading: 1.6;
+  --measure: 75ch;
+}
+
+html { scroll-behavior: smooth; }
+html.no-js .reveal { opacity: 1 !important; transform: none !important; }
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--body-size);
+  line-height: var(--body-leading);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection { background: var(--selection); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; text-decoration: none; }
+
+/* ============================================
+   UTILITY
+   ============================================ */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); border: 0;
+}
+
+.rule {
+  border: 0;
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+.rule--accent {
+  height: 4px;
+  background: var(--accent);
+  width: 60px;
+}
+
+/* ============================================
+   MASTHEAD
+   ============================================ */
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.masthead__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px var(--pad);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.masthead__brand {
+  text-align: center;
+  padding: 16px var(--pad) 8px;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.masthead__logo {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.masthead__logo-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+}
+
+.masthead__logo-rule {
+  display: block;
+  width: 100%;
+  height: 4px;
+  background: var(--accent);
+  margin-top: 4px;
+}
+
+.masthead__tagline {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.875rem;
+  color: var(--secondary);
+  margin-top: 4px;
+}
+
+.masthead__nav {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  padding: 0 var(--pad);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.masthead__nav a {
+  display: block;
+  padding: 8px 20px;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.masthead__nav a:hover,
+.masthead__nav a:focus-visible {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .masthead__nav a { transition: none; }
+}
+
+.masthead__nav .nav-divider {
+  width: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+/* ============================================
+   LEAD ARTICLE
+   ============================================ */
+.lead {
+  padding: var(--section-py) 0;
+}
+
+.lead__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gutter);
+  align-items: start;
+}
+
+.lead__visual {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.lead__building {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.lead__building svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lead__content {
+  padding-top: 8px;
+}
+
+.lead__category {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.lead__category::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.lead__headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+
+.lead__standfirst {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.125rem, 1.4vw, 1.375rem);
+  line-height: 1.5;
+  color: var(--secondary);
+  margin-bottom: 24px;
+}
+
+.lead__byline {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+
+.lead__byline a {
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+
+.lead__byline a:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.lead__body {
+  max-width: var(--measure);
+}
+
+.lead__body p {
+  margin-bottom: 1em;
+}
+
+.lead__body .dropcap::first-letter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 4rem;
+  line-height: 0.8;
+  float: left;
+  padding-right: 8px;
+  padding-top: 4px;
+  color: var(--fg);
+}
+
+/* ============================================
+   SECTION HEADERS
+   ============================================ */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-top: var(--section-py);
+}
+
+.section-header__label {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.section-header__rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ============================================
+   FEATURED STORIES
+   ============================================ */
+.featured {
+  padding-bottom: var(--section-py);
+}
+
+.featured__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gutter);
+}
+
+.article-card {
+  border-top: 3px solid var(--accent);
+  padding-top: 16px;
+  transition: background 0.2s;
+  padding: 16px 12px 24px;
+  margin: -12px;
+}
+
+.article-card:hover {
+  background: var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-card { transition: none; }
+}
+
+.article-card__category {
+  font-family: var(--font-ui);
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--secondary);
+  margin-bottom: 8px;
+}
+
+.article-card__headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.125rem, 1.2vw, 1.375rem);
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.article-card__summary {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--secondary);
+  margin-bottom: 16px;
+}
+
+.article-card__meta {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+
+.article-card__meta .author {
+  color: var(--fg);
+}
+
+/* ============================================
+   IN-DEPTH FEATURE
+   ============================================ */
+.indepth {
+  padding: var(--section-py) 0;
+  background: var(--surface);
+}
+
+.indepth .container {
+  max-width: calc(var(--max-width) + 80px);
+}
+
+.indepth__header {
+  margin-bottom: 40px;
+}
+
+.indepth__category {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.indepth__headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.75rem, 3.2vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  max-width: 20ch;
+  margin-bottom: 16px;
+}
+
+.indepth__byline {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.indepth__columns {
+  column-count: 2;
+  column-gap: 40px;
+  column-rule: 1px solid var(--border);
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+.indepth__columns .dropcap::first-letter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 3.5rem;
+  line-height: 0.8;
+  float: left;
+  padding-right: 6px;
+  padding-top: 4px;
+  color: var(--fg);
+}
+
+.indepth__columns p {
+  margin-bottom: 1.2em;
+  text-indent: 0;
+}
+
+.indepth__columns p + p {
+  text-indent: 0;
+}
+
+.indepth__pullquote {
+  column-span: all;
+  margin: 24px 0;
+  padding: 24px 0;
+  border-top: 3px solid var(--accent);
+  border-bottom: 3px solid var(--accent);
+  text-align: center;
+}
+
+.indepth__pullquote blockquote {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-style: italic;
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  line-height: 1.2;
+  max-width: 20ch;
+  margin: 0 auto;
+  color: var(--accent);
+}
+
+.indepth__pullquote cite {
+  display: block;
+  margin-top: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary);
+}
+
+/* ============================================
+   REVIEWS
+   ============================================ */
+.reviews {
+  padding: var(--section-py) 0;
+}
+
+.reviews__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gutter);
+}
+
+.review-card {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.review-card__type {
+  font-family: var(--font-ui);
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.review-card__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.375rem;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.review-card__author {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--secondary);
+  margin-bottom: 12px;
+}
+
+.review-card__text {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--secondary);
+  margin-bottom: 16px;
+}
+
+.review-card__rating {
+  display: flex;
+  gap: 4px;
+}
+
+.review-card__rating .star {
+  width: 14px;
+  height: 14px;
+  background: var(--border);
+}
+
+.review-card__rating .star--filled {
+  background: var(--accent);
+}
+
+.review-card__reviewer {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.footer {
+  background: var(--fg);
+  color: var(--bg);
+  padding: 64px 0 48px;
+  margin-top: 0;
+}
+
+.footer .container {
+  max-width: calc(var(--max-width) - 80px);
+}
+
+.footer__grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: var(--gutter);
+}
+
+.footer__brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.footer__desc {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-top: 8px;
+  max-width: 35ch;
+}
+
+.footer__heading {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.footer__nav {
+  list-style: none;
+}
+
+.footer__nav li {
+  margin-bottom: 10px;
+}
+
+.footer__nav a {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--bg);
+  transition: color 0.2s;
+}
+
+.footer__nav a:hover {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer__nav a { transition: none; }
+}
+
+.footer__subscribe {
+  margin-top: 8px;
+}
+
+.footer__subscribe .btn {
+  display: inline-block;
+  padding: 12px 28px;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+  background: var(--bg);
+  border: 0;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  text-decoration: none;
+}
+
+.footer__subscribe .btn:hover,
+.footer__subscribe .btn:focus-visible {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer__subscribe .btn { transition: none; }
+}
+
+.footer__colophon {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(180, 171, 160, 0.3);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  line-height: 1.7;
+  color: var(--muted);
+  text-align: center;
+}
+
+.footer__colophon a {
+  color: var(--bg);
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+.footer__colophon a:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================================
+   RESPONSIVE — TABLET
+   ============================================ */
+@media (max-width: 1023px) {
+  .lead__grid {
+    grid-template-columns: 1fr;
+  }
+  .lead__visual {
+    aspect-ratio: 16 / 9;
+  }
+  .indepth__columns {
+    column-count: 1;
+    column-gap: 0;
+    column-rule: none;
+  }
+  .indepth__pullquote {
+    column-span: none;
+  }
+  .footer__grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+
+@media (max-width: 767px) {
+  .featured__grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .reviews__grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .footer__grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .masthead__meta {
+    font-size: 0.5625rem;
+    padding: 6px 16px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .masthead__nav {
+    justify-content: flex-start;
+    padding: 0 16px;
+  }
+
+  .masthead__nav a {
+    padding: 8px 12px;
+    font-size: 0.6875rem;
+  }
+
+  .container {
+    padding: 0 20px;
+  }
+
+  .lead__body .dropcap::first-letter {
+    font-size: 3rem;
+  }
+
+  .indepth__columns .dropcap::first-letter {
+    font-size: 2.8rem;
+  }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+  .masthead { position: static; }
+  .masthead__nav { display: none; }
+  .footer { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========================================
+     MASTHEAD
+     ======================================== -->
+<header class="masthead" role="banner">
+  <div class="masthead__meta">
+    <span>Tuesday, 4 July 2026</span>
+    <span>Vol. IV, No. 12</span>
+  </div>
+
+  <div class="masthead__brand">
+    <a href="/" class="masthead__logo" aria-label="PLANE — Architecture criticism for the built world">
+      <span class="masthead__logo-text">PLANE</span>
+      <span class="masthead__logo-rule" aria-hidden="true"></span>
+    </a>
+    <div class="masthead__tagline">Architecture criticism for the built world</div>
+  </div>
+
+  <nav class="masthead__nav" aria-label="Main navigation">
+    <a href="#lead">Features</a>
+    <span class="nav-divider" role="presentation" aria-hidden="true"></span>
+    <a href="#reviews">Reviews</a>
+    <span class="nav-divider" role="presentation" aria-hidden="true"></span>
+    <a href="#indepth">Essays</a>
+    <span class="nav-divider" role="presentation" aria-hidden="true"></span>
+    <a href="#indepth">In Depth</a>
+    <span class="nav-divider" role="presentation" aria-hidden="true"></span>
+    <a href="#featured">Criticism</a>
+    <span class="nav-divider" role="presentation" aria-hidden="true"></span>
+    <a href="#footer">Archive</a>
+    <span class="nav-divider" role="presentation" aria-hidden="true"></span>
+    <a href="#footer">Subscribe</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ========================================
+       LEAD ARTICLE
+       ======================================== -->
+  <article class="lead" id="lead" aria-labelledby="lead-headline">
+    <div class="container">
+      <div class="lead__grid">
+        <div class="lead__visual" aria-hidden="true">
+          <div class="lead__building">
+            <svg viewBox="0 0 600 450" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+              <!-- Background -->
+              <rect width="600" height="450" fill="#ede8de"/>
+              <!-- Sky / negative space -->
+              <rect x="0" y="0" width="600" height="30" fill="#f4f1eb"/>
+
+              <!-- Main tower -->
+              <rect x="180" y="30" width="240" height="390" fill="#d4cec4" stroke="#1a1814" stroke-width="1.5"/>
+
+              <!-- Structural lines (horizontal) -->
+              <line x1="180" y1="75" x2="420" y2="75" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="120" x2="420" y2="120" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="165" x2="420" y2="165" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="210" x2="420" y2="210" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="255" x2="420" y2="255" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="300" x2="420" y2="300" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="345" x2="420" y2="345" stroke="#1a1814" stroke-width="1"/>
+              <line x1="180" y1="390" x2="420" y2="390" stroke="#1a1814" stroke-width="1"/>
+
+              <!-- Window columns on main tower -->
+              <rect x="200" y="85" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="230" y="85" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="260" y="85" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="290" y="85" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="320" y="85" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="350" y="85" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="380" y="85" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+
+              <rect x="200" y="130" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="230" y="130" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="260" y="130" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="290" y="130" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="320" y="130" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="350" y="130" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="380" y="130" width="20" height="25" fill="#f4f1eb"/>
+
+              <rect x="200" y="175" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="230" y="175" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="260" y="175" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="290" y="175" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="320" y="175" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="350" y="175" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="380" y="175" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+
+              <rect x="200" y="220" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="230" y="220" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="260" y="220" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="290" y="220" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="320" y="220" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="350" y="220" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="380" y="220" width="20" height="25" fill="#f4f1eb"/>
+
+              <rect x="200" y="265" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="230" y="265" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="260" y="265" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="290" y="265" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="320" y="265" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="350" y="265" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="380" y="265" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+
+              <rect x="200" y="310" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="230" y="310" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="260" y="310" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="290" y="310" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="320" y="310" width="20" height="25" fill="#f4f1eb"/>
+              <rect x="350" y="310" width="20" height="25" fill="#1a1814" opacity="0.3"/>
+              <rect x="380" y="310" width="20" height="25" fill="#f4f1eb"/>
+
+              <!-- Left lower block -->
+              <rect x="60" y="270" width="100" height="150" fill="#d4cec4" stroke="#1a1814" stroke-width="1.5"/>
+              <line x1="60" y1="310" x2="160" y2="310" stroke="#1a1814" stroke-width="0.75"/>
+              <line x1="60" y1="350" x2="160" y2="350" stroke="#1a1814" stroke-width="0.75"/>
+              <rect x="75" y="282" width="30" height="22" fill="#f4f1eb"/>
+              <rect x="115" y="282" width="30" height="22" fill="#1a1814" opacity="0.3"/>
+              <rect x="75" y="320" width="30" height="22" fill="#1a1814" opacity="0.3"/>
+              <rect x="115" y="320" width="30" height="22" fill="#f4f1eb"/>
+
+              <!-- Right lower block -->
+              <rect x="440" y="200" width="100" height="220" fill="#d4cec4" stroke="#1a1814" stroke-width="1.5"/>
+              <line x1="440" y1="255" x2="540" y2="255" stroke="#1a1814" stroke-width="0.75"/>
+              <line x1="440" y1="310" x2="540" y2="310" stroke="#1a1814" stroke-width="0.75"/>
+              <line x1="440" y1="365" x2="540" y2="365" stroke="#1a1814" stroke-width="0.75"/>
+              <rect x="455" y="212" width="25" height="32" fill="#f4f1eb"/>
+              <rect x="500" y="212" width="25" height="32" fill="#1a1814" opacity="0.3"/>
+              <rect x="455" y="267" width="25" height="32" fill="#1a1814" opacity="0.3"/>
+              <rect x="500" y="267" width="25" height="32" fill="#f4f1eb"/>
+              <rect x="455" y="322" width="25" height="32" fill="#f4f1eb"/>
+              <rect x="500" y="322" width="25" height="32" fill="#1a1814" opacity="0.3"/>
+
+              <!-- Ground line -->
+              <rect x="0" y="420" width="600" height="30" fill="#1a1814"/>
+              <rect x="0" y="420" width="600" height="3" fill="#a84c3e"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="lead__content">
+          <div class="lead__category">Cover Feature</div>
+          <h1 id="lead-headline" class="lead__headline">The Vertical City</h1>
+          <p class="lead__standfirst">As urban populations swell and horizontal land grows scarce, architects are reimagining the high-rise not as a tower of isolation but as a vertical neighbourhood — intricate, layered, and unmistakably public.</p>
+          <div class="lead__byline">By <a href="#">Eleanor Voss</a> &nbsp;·&nbsp; Photography by <a href="#">Markus Chen</a></div>
+          <div class="lead__body">
+            <p class="dropcap"><span class="sr-only">T</span>he skyline of every major city tells a story of ambition — steel reaching upward as land values climb. But a new generation of architects argues that tall buildings have failed their social promise. Stacking identical floor plates on a central core produces efficient real estate, not community. The result, they say, is a city of isolated towers connected only by wind and shadow.</p>
+            <p>In response, firms across Europe and Asia are prototyping what might be called the "vertical neighbourhood" — a high-rise whose floors are not carbon copies but differentiated spaces that blend living, working, and public life within a single structure. The key insight is that density and sociability are not opposites when the architecture mediates between them.</p>
+            <p>Projects such as MVRDV's Valley in Amsterdam and the mixed-use towers of Singapore's Marina Bay demonstrate that variation in floor plate, sky gardens at multiple elevations, and genuinely public programme at grade can transform the high-rise from a private enclave into an urban contributor.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <hr class="rule" aria-hidden="true">
+
+  <!-- ========================================
+       FEATURED STORIES
+       ======================================== -->
+  <section class="featured" id="featured" aria-labelledby="featured-heading">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label" id="featured-heading">Featured Stories</span>
+        <span class="section-header__rule" aria-hidden="true"></span>
+      </div>
+
+      <div class="featured__grid">
+        <article class="article-card" aria-labelledby="art1-headline">
+          <div class="article-card__category">Criticism</div>
+          <h2 id="art1-headline" class="article-card__headline">Brutalism's Second Life</h2>
+          <p class="article-card__summary">Once derided as cold and oppressive, brutalist architecture is finding a new audience. But does the revival engage with the buildings as they were meant to be used, or merely aestheticise their surfaces?</p>
+          <div class="article-card__meta"><span class="author">James Whitfield</span> · 14 min read</div>
+        </article>
+
+        <article class="article-card" aria-labelledby="art2-headline">
+          <div class="article-card__category">Urbanism</div>
+          <h2 id="art2-headline" class="article-card__headline">The House That Time Built</h2>
+          <p class="article-card__summary">Adaptive reuse projects in Lisbon and Milan are proving that the most radical architecture is often the quietest — letting a building's accumulated history shape its next life rather than erasing it.</p>
+          <div class="article-card__meta"><span class="author">Sofia Reyes</span> · 11 min read</div>
+        </article>
+
+        <article class="article-card" aria-labelledby="art3-headline">
+          <div class="article-card__category">Landscape</div>
+          <h2 id="art3-headline" class="article-card__headline">Water and Stone</h2>
+          <p class="article-card__summary">Along Europe's eroding coastlines, a quiet movement of landscape architects is designing with rising tides rather than against them — using stone, sediment, and planted edges to absorb the sea's advance.</p>
+          <div class="article-card__meta"><span class="author">Clara Nordström</span> · 9 min read</div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule" aria-hidden="true">
+
+  <!-- ========================================
+       IN-DEPTH FEATURE
+       ======================================== -->
+  <article class="indepth" id="indepth" aria-labelledby="indepth-headline">
+    <div class="container">
+      <div class="indepth__header">
+        <div class="indepth__category">In Depth</div>
+        <h2 id="indepth-headline" class="indepth__headline">Reimagining the Public Realm</h2>
+        <div class="indepth__byline">By <strong>Daniel Auerbach</strong> · Photographs by <strong>Ingrid Solvik</strong> · 22 min read</div>
+      </div>
+
+      <div class="indepth__columns">
+        <p class="dropcap"><span class="sr-only">A</span>public square is never empty. Even when no one occupies its benches or crosses its paving, the square holds the memory of assembly, the geometry of civic intention, and the silent argument of who belongs and who does not. For two decades, European cities have poured investment into public space — pedestrianising thoroughfares, installing paving patterns and permanent furniture, commissioning landmark pavilions. Yet the most honest question facing urban designers today is whether these spaces are genuinely public or merely publicly accessible.</p>
+
+        <p>The distinction matters. A space can be open to everyone in law while remaining unwelcoming in fact — through sight lines that favour surveillance over comfort, seating that repels rest, programme that excludes without a ticket. The term "public realm" has become a developer's amenity, as negotiable as a gym membership or a concierge desk. True public space, by contrast, is defined not by ownership but by use: it is the ground where strangers negotiate coexistence without a script.</p>
+
+        <p>Recent projects suggest a quiet return to first principles. In Barcelona, the transformation of the Via Laietana is less about new architecture than about redistributing existing space — widening pavements, reducing vehicle lanes, introducing permeable surfaces that allow the soil beneath to breathe. The result is not photogenic, which may be its greatest virtue. It does not declare itself as a destination; it simply makes the everyday city more habitable.</p>
+
+        <p>Similarly, the ongoing work at Munich's Karlsplatz has rejected the temptation to install a signature building. Instead, the design team has focused on the ground plane: lowering road levels to create a continuous pedestrian surface, introducing staggered granite blocks that double as seating and drainage, and planting a grove of honey locusts whose canopy will, in a decade, define the space more than any wall. The architecture here is almost invisible — and that is the point.</p>
+
+        <div class="indepth__pullquote">
+          <blockquote>
+            "True public space is defined not by ownership but by use: the ground where strangers negotiate coexistence without a script."
+            <cite>— Daniel Auerbach</cite>
+          </blockquote>
+        </div>
+
+        <p>The most contested frontier of public space may be the street itself. Paris, under its "Ville du Quart d'Heure" initiative, has begun reclassifying road space not as a transportation corridor but as a sequence of public rooms — each intersection a potential square, each widened pavement a potential front porch. The architectural implication is subtle but profound: when the street becomes a room, the buildings that line it become its walls, and their ground-floor facades must perform as interior surfaces, not as monuments to corporate identity.</p>
+
+        <p>What these projects share is a refusal to monumentalise. They understand that public space is a practice, not a product. The architect's role is not to deliver a finished composition but to construct the conditions under which public life can emerge — a ground plane with enough ambiguity to accommodate the unpredictable. This demands a kind of humility that the profession does not always reward. The next great public space may well be one that no one photographs on opening day, because it looks unfinished. A decade later, it will be indispensable.</p>
+
+        <p>The lessons for architects working at any scale are clear: resist the urge to over-determine. Design the edges, the surfaces, the transitions — the moments where public life actually happens — and let the centre remain open. The most powerful civic gesture is sometimes simply to step back and leave room for someone else to act.</p>
+      </div>
+    </div>
+  </article>
+
+  <hr class="rule" aria-hidden="true">
+
+  <!-- ========================================
+       REVIEWS
+       ======================================== -->
+  <section class="reviews" id="reviews" aria-labelledby="reviews-heading">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label" id="reviews-heading">Reviews</span>
+        <span class="section-header__rule" aria-hidden="true"></span>
+      </div>
+
+      <div class="reviews__grid">
+        <article class="review-card" aria-labelledby="rev1-title">
+          <div class="review-card__type">Book</div>
+          <h3 id="rev1-title" class="review-card__title">The Architecture of Absence</h3>
+          <div class="review-card__author">By Marina Otero Verzier — MIT Press, 2026</div>
+          <p class="review-card__text">Otero Verzier constructs a rigorous argument for what she calls "negative architectural practice" — design that operates through removal, subtraction, and deliberate incompleteness. Drawing on case studies from Detroit to Detmold, the book challenges the profession's addiction to addition without ever lapsing into cynicism. Essential reading for anyone who suspects that the most ethical architectural act may sometimes be to build nothing at all.</p>
+          <div class="review-card__rating" aria-label="4 out of 5">
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star" aria-hidden="true"></span>
+          </div>
+          <div class="review-card__reviewer">Reviewed by Alice Durand</div>
+        </article>
+
+        <article class="review-card" aria-labelledby="rev2-title">
+          <div class="review-card__type">Exhibition</div>
+          <h3 id="rev2-title" class="review-card__title">Concrete Utopias</h3>
+          <div class="review-card__author">Museum of Modern Art, Oslo — until September 2026</div>
+          <p class="review-card__text">A survey of Scandinavian brutalism that resists the easy nostalgia of recent revivals. Curator Hanna Eide has assembled a sharp selection of original drawings, period photography, and newly commissioned documentation that foregrounds the social ambitions behind the raw concrete: universal healthcare, public education, collective housing. The buildings are not always beautiful, but the ideals that shaped them deserve this careful, unsentimental reckoning.</p>
+          <div class="review-card__rating" aria-label="five-star rating">
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+            <span class="star star--filled" aria-hidden="true"></span>
+          </div>
+          <div class="review-card__reviewer">Reviewed by Tomás Guerra</div>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ========================================
+     FOOTER
+     ======================================== -->
+<footer class="footer" id="footer" role="contentinfo">
+  <div class="container">
+    <div class="footer__grid">
+      <div>
+        <div class="footer__brand">PLANE</div>
+        <p class="footer__desc">Architecture criticism for the built world. Independent, unsponsored, ad-free. Every voice matters, every building deserves a thought.</p>
+      </div>
+
+      <div>
+        <div class="footer__heading">Sections</div>
+        <ul class="footer__nav">
+          <li><a href="#lead">Features</a></li>
+          <li><a href="#reviews">Reviews</a></li>
+          <li><a href="#indepth">Essays</a></li>
+          <li><a href="#featured">Criticism</a></li>
+          <li><a href="#">Archive</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="footer__heading">Information</div>
+        <ul class="footer__nav">
+          <li><a href="#">About</a></li>
+          <li><a href="#">Contributors</a></li>
+          <li><a href="#">Submissions</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="mailto:contact@planemagazine.com">Contact</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="footer__heading">Subscribe</div>
+        <ul class="footer__nav">
+          <li><a href="#">Print edition</a></li>
+          <li><a href="#">Digital access</a></li>
+          <li><a href="#">Student rates</a></li>
+        </ul>
+        <div class="footer__subscribe">
+          <a class="btn" href="mailto:subscribe@planemagazine.com">Get a trial issue</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer__colophon">
+      <p>PLANE is an independent publication. All content © 2026 PLANE Magazine and its contributors. Set in <a href="https://fonts.google.com/specimen/Playfair+Display" target="_blank" rel="noopener">Playfair Display</a>, <a href="https://fonts.google.com/specimen/Source+Serif+4" target="_blank" rel="noopener">Source Serif 4</a>, and <a href="https://fonts.google.com/specimen/Inter" target="_blank" rel="noopener">Inter</a>. Printed on a digital press. No AI-generated content.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.documentElement.classList.remove('no-js');
+</script>
+
+</body>
+</html>

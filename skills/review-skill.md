@@ -47,6 +47,25 @@ Inspect at least:
 Check horizontal overflow, text wrapping, navigation, content priority, touch
 targets, image cropping, tables, charts, and fixed/sticky elements.
 
+Run `data/qa/overlap-check.js` (from this package) in the browser console at
+each tested viewport: it reports text elements that overlap each other or
+exit the viewport — the sticky-header-over-headline class of defect that
+neither validators nor casual scrolling catch. Fix every reported pair.
+
+Before any full-page capture, scroll through the entire page once so
+lazy-loaded images are actually loaded, then reset to the top. A capture with
+empty image slots is false evidence even when the live page is fine.
+
+Look at the captured full-page screenshots as images, not just file names.
+Large blank bands mean content is hidden at initial paint (usually a scroll
+reveal starting from opacity 0). That is a delivery defect: make the content
+legible without JavaScript or motion, then recapture.
+
+In the same captures, verify every control is legible: a button whose label
+color matches its background, text over photography without a scrim or
+measured contrast, and headline collisions with imagery are delivery defects,
+not polish items.
+
 ## 4. Accessibility review
 
 - One clear page-level heading and logical hierarchy.
@@ -74,6 +93,14 @@ Ask:
 - Does imagery explain the product or merely occupy space?
 - Does each prominent visual decision have a product, content, interaction, or
   brand rationale?
+
+Then run the substitutability test on the final page: could this hero, these
+sections, and this copy introduce a different product after only a logo swap?
+Check the template tells one by one — identical padding between all sections,
+every block centered, display type that never grows past ~3.5rem, buttons
+labelled "Get Started"/"Learn More", missing favicon/title/meta description,
+no styled focus or `::selection` states, no rule-break anywhere on the page.
+Each hit is evidence the page will read as generated rather than designed.
 
 Fix the smallest underlying cause. Do not chase novelty for its own sake.
 

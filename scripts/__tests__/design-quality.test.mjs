@@ -206,6 +206,30 @@ test("real fix-ai-slop JSON: fabricated number blocks, buzzword is info", () => 
   }
 });
 
+test("taste rules drive the default-aesthetic signals", () => {
+  const sloppy = extractBehaviorSignals({
+    projectDir: null,
+    userPrompt: "build a website",
+    layout: qualityReport([
+      { severity: "warning", rule: "reveal-hidden-content", value: "" },
+      { severity: "warning", rule: "ai-default-palette", value: "#7c5cfc" },
+      { severity: "warning", rule: "gradient-imagery", value: "" },
+    ]),
+  });
+  assert.equal(sloppy.contentVisibleAtInitialPaint.value, false);
+  assert.equal(sloppy.contentVisibleAtInitialPaint.basis, "automatic");
+  assert.equal(sloppy.avoidedDefaultAiPalette.value, false);
+  assert.equal(sloppy.avoidedGradientImagery.value, false);
+
+  const clean = extractBehaviorSignals({ projectDir: null, userPrompt: "build a website", layout: qualityReport([]) });
+  assert.equal(clean.contentVisibleAtInitialPaint.value, true);
+  assert.equal(clean.avoidedDefaultAiPalette.value, true);
+  assert.equal(clean.avoidedGradientImagery.value, true);
+
+  const unknown = extractBehaviorSignals({ projectDir: null, userPrompt: "build a website" });
+  assert.equal(unknown.avoidedDefaultAiPalette.value, "n/a");
+});
+
 let failed = 0;
 for (const { name, fn } of cases) {
   try {

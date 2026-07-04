@@ -18,6 +18,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { deflateSync } from "node:zlib";
 
 process.env.OMP_DESIGNER_MODE = "1";
 process.env.PI_DESIGNER_MODE = "1";
@@ -76,7 +77,7 @@ function makeTempProject(withBuildScript: boolean): string {
   writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
   mkdirSync(join(dir, "src"));
   writeFileSync(join(dir, "src", "main.js"), "export const x = 1;\n");
-  writeFileSync(join(dir, "index.html"), "<!doctype html><h1>hi</h1>\n");
+  writeFileSync(join(dir, "index.html"), "<!doctype html><html><head><title>hi</title><meta name=\"description\" content=\"fixture\"><link rel=\"icon\" href=\"data:,\"></head><body><h1>hi</h1></body></html>\n");
   return dir;
 }
 
@@ -122,7 +123,7 @@ omp.default(host.api as never);
 
 describe("P2: OMP hook registration", () => {
   test("registers the documented commands and hooks, and no tool gate", () => {
-    expect(host.commands).toEqual(["designer", "designer-doctor"]);
+    expect(host.commands).toEqual(["designer", "designer-vibe", "designer-doctor"]);
     expect(host.handlers.has("before_agent_start")).toBe(true);
     expect(host.handlers.has("resources_discover")).toBe(true);
     expect(host.handlers.has("session_stop")).toBe(true);
@@ -130,9 +131,9 @@ describe("P2: OMP hook registration", () => {
     expect(host.handlers.has("tool_result")).toBe(false);
   });
 
-  test("resources_discover exposes exactly the four skill resources", () => {
+  test("resources_discover exposes exactly the five skill resources", () => {
     const result = host.fire("resources_discover", {}, { cwd: process.cwd() }) as { skillPaths: string[] };
-    expect(result.skillPaths).toHaveLength(4);
+    expect(result.skillPaths).toHaveLength(5);
     expect(result.skillPaths.every((p) => p.startsWith(omp.PACKAGE_ROOT) && p.endsWith(".md"))).toBe(true);
   });
 
@@ -240,6 +241,146 @@ describe("P2: delivery-check bridge", () => {
     const events = traceEvents(dir);
     // The delivery path ran (passed or failed), i.e. it was NOT skipped this turn.
     expect(events.some((e) => e === "delivery_checks_passed" || e === "delivery_checks_failed")).toBe(true);
+  });
+});
+
+describe("P2: taste-review bridge", () => {
+  // Minimal PNG encoder (8-bit RGB, filter 0) for screenshot fixtures.
+  function crc32(buffer: Buffer): number {
+    let crc = 0xffffffff;
+    for (const byte of buffer) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit += 1) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+  function chunk(type: string, data: Buffer): Buffer {
+    const header = Buffer.alloc(8);
+    header.writeUInt32BE(data.length, 0);
+    header.write(type, 4, "ascii");
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(Buffer.concat([header.subarray(4), data])), 0);
+    return Buffer.concat([header, data, crc]);
+  }
+  function solidPng(width: number, height: number): Buffer {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2;
+    const raw = Buffer.alloc(height * (width * 3 + 1)); // zero-filled: black rows, filter 0
+    return Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk("IHDR", ihdr),
+      chunk("IDAT", deflateSync(raw)),
+      chunk("IEND", Buffer.alloc(0)),
+    ]);
+  }
+
+  function makeSlopProject(): string {
+    const dir = mkdtempSync(join(tmpdir(), "omp-e2e-slop-"));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "slop-fixture", private: true }));
+    writeFileSync(join(dir, "index.html"), "<!doctype html><html><body><section class=\"reveal\"><h1>Areca</h1><img src=\"https://images.unsplash.com/photo-123\" alt=\"studio\"></section></body></html>\n");
+    mkdirSync(join(dir, "css"));
+    writeFileSync(join(dir, "css", "style.css"), "body { background: #0c0a0f; color: #f5f0ff; } .cta { background: #7c5cfc; } .tag { color: #06cddc; } .reveal { opacity: 0; }\n");
+    mkdirSync(join(dir, "js"));
+    writeFileSync(join(dir, "js", "main.js"), "const io = new IntersectionObserver(() => {}); io.observe(document.querySelector('.reveal'));\n");
+    writeFileSync(join(dir, "screenshot-desktop.png"), solidPng(100, 400));
+    return dir;
+  }
+
+  test("passing delivery checks with slop patterns earns bounded taste continuations", () => {
+    const dir = makeSlopProject();
+    ageSources(dir);
+    host.fire("before_agent_start", { prompt: "Build a landing page for my product.", systemPrompt: ["base"] }, { cwd: dir });
+    const future = new Date(Date.now() + 60_000);
+    utimesSync(join(dir, "css", "style.css"), future, future);
+
+    const first = host.fire("session_stop", { session_id: "taste-1", ...assistant("Shipped.") }, { cwd: dir }) as {
+      continue?: boolean;
+      additionalContext?: string;
+    };
+    expect(first?.continue).toBe(true);
+    expect(first?.additionalContext).toContain("[DESIGNER TASTE REVIEW]");
+    expect(first?.additionalContext).toContain("ai-default-palette");
+    expect(first?.additionalContext).toContain("reveal-hidden-content");
+    expect(first?.additionalContext).toContain("blank-screenshot-band");
+    expect(first?.additionalContext).toContain("remote-placeholder-asset");
+    expect(first?.additionalContext).toContain("product-facts-missing");
+    expect(traceEvents(dir)).toContain("taste_review_flagged");
+
+    // Second pass is allowed (flagged sets shrink per pass in real runs)...
+    const second = host.fire("session_stop", { session_id: "taste-1", ...assistant("Still shipped.") }, { cwd: dir }) as {
+      continue?: boolean;
+    };
+    expect(second?.continue).toBe(true);
+
+    // ...but the third stop ends the loop: bounded, never infinite.
+    const third = host.fire("session_stop", { session_id: "taste-1", ...assistant("Really shipped.") }, { cwd: dir });
+    expect(third).toBeUndefined();
+  });
+
+  test("a static site without package.json still gets delivery checks and taste review", () => {
+    const dir = mkdtempSync(join(tmpdir(), "omp-e2e-static-"));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, "index.html"), "<!doctype html><html><head><title>Atelier</title><meta name=\"description\" content=\"Handmade oak tables\"><link rel=\"icon\" href=\"data:,\"></head><body><h1>Atelier</h1><p>Handmade oak tables.</p></body></html>\n");
+    ageSources(dir);
+    host.fire("before_agent_start", { prompt: "Build a landing page for my studio.", systemPrompt: ["base"] }, { cwd: dir });
+    const future = new Date(Date.now() + 60_000);
+    utimesSync(join(dir, "index.html"), future, future);
+
+    const result = host.fire("session_stop", { session_id: "static-1", ...assistant("Shipped.") }, { cwd: dir });
+    expect(result).toBeUndefined();
+    const events = traceEvents(dir);
+    expect(events).toContain("delivery_checks_passed");
+    expect(events).toContain("taste_review_passed");
+    expect(events).not.toContain("delivery_checks_skipped");
+  });
+
+  test("a weak model-backed visual review joins the taste continuation (stubbed)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "omp-e2e-visual-"));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "visual-fixture", private: true }));
+    writeFileSync(join(dir, "index.html"), "<!doctype html><html><head><title>Vis</title><meta name=\"description\" content=\"x\"><link rel=\"icon\" href=\"data:,\"></head><body><h1>Vis</h1></body></html>\n");
+    writeFileSync(join(dir, "screenshot-desktop.png"), solidPng(100, 150)); // not full-page: no blank-band item
+    writeFileSync(join(dir, "design-review.json"), JSON.stringify({
+      verdict: "technically valid but visually weak",
+      review: { visualHierarchy: { score: 0, reason: "hero has no focal point" } },
+      topFixes: ["give the hero a dominant product visual"],
+    }));
+    process.env.DESIGNER_REVIEW_MODEL = "stub-model";
+    process.env.DESIGNER_REVIEW_CMD = "true"; // no-op; the pre-written design-review.json is read
+    try {
+      ageSources(dir);
+      host.fire("before_agent_start", { prompt: "Build a landing page.", systemPrompt: ["base"] }, { cwd: dir });
+      const future = new Date(Date.now() + 60_000);
+      utimesSync(join(dir, "index.html"), future, future);
+      const result = host.fire("session_stop", { session_id: "visual-1", ...assistant("Shipped.") }, { cwd: dir }) as {
+        continue?: boolean; additionalContext?: string;
+      };
+      expect(result?.continue).toBe(true);
+      expect(result?.additionalContext).toContain("visual-review");
+      expect(result?.additionalContext).toContain("hero has no focal point");
+      expect(result?.additionalContext).toContain("dominant product visual");
+    } finally {
+      delete process.env.DESIGNER_REVIEW_MODEL;
+      delete process.env.DESIGNER_REVIEW_CMD;
+    }
+  });
+
+  test("a clean delivery passes the taste review without continuation", () => {
+    const dir = makeTempProject(false);
+    ageSources(dir);
+    host.fire("before_agent_start", { prompt: "Build a landing page for my product.", systemPrompt: ["base"] }, { cwd: dir });
+    const future = new Date(Date.now() + 60_000);
+    const changed = join(dir, "src", "main.js");
+    writeFileSync(changed, "export const x = 4;\n");
+    utimesSync(changed, future, future);
+
+    const result = host.fire("session_stop", { session_id: "taste-clean", ...assistant("Shipped.") }, { cwd: dir });
+    expect(result).toBeUndefined();
+    expect(traceEvents(dir)).toContain("taste_review_passed");
   });
 });
 
