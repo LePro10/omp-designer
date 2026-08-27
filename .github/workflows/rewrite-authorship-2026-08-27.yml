@@ -1,0 +1,29 @@
+name: Rewrite commit authorship
+on:
+  push:
+    branches: [automation/rewrite-authorship-2026-08-27]
+permissions:
+  contents: write
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Rewrite authorship and preserve dates
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE='backup/before-authorship-rewrite-2026-08-27'; TARGET='rewrite/lepro10-authorship-dates-2026-08-27'
+          git fetch origin "refs/heads/$SOURCE:refs/remotes/origin/$SOURCE"
+          git checkout -B "$TARGET" "refs/remotes/origin/$SOURCE"
+          OLD_TREE="$(git rev-parse 'HEAD^{tree}')"
+          export FILTER_BRANCH_SQUELCH_WARNING=1
+          git filter-branch --force --env-filter '
+            export GIT_AUTHOR_NAME="Leandro Probst"; export GIT_AUTHOR_EMAIL="leandro.probst@bbzbl-it.ch"
+            export GIT_COMMITTER_NAME="Leandro Probst"; export GIT_COMMITTER_EMAIL="leandro.probst@bbzbl-it.ch"
+          ' -- HEAD
+          test "$OLD_TREE" = "$(git rev-parse 'HEAD^{tree}')"
+          EXPECTED=$'Leandro Probst\tleandro.probst@bbzbl-it.ch\tLeandro Probst\tleandro.probst@bbzbl-it.ch'
+          if git log --format='%an%x09%ae%x09%cn%x09%ce' | grep -Fvx "$EXPECTED"; then exit 1; fi
+          git push origin "HEAD:refs/heads/$TARGET" --force
