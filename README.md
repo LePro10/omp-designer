@@ -194,6 +194,16 @@ pre-execution enforcement. They run only after real project files change during 
 session; a pure chat or planning turn spawns no build. A failed check yields one
 bounded repair continuation. Pi does not run this backstop.
 
+The build check never ships. It runs `npm run designer:build` when the project
+defines that script; otherwise `npm run build`, unless `build`, its `pre`/`post`
+hooks, or a script they call through `npm run`/`yarn`/`pnpm run`/`bun run`
+mentions a deploy, publish, migrate, or push step (for example
+`convex deploy --cmd 'next build'`). Such builds are skipped with a reason; add a
+local-only `designer:build` (here `next build`) to check them. Set
+`OMP_DESIGNER_BUILD=0` to skip builds everywhere. Validators run under `node`
+(or `bun`) resolved from `PATH`, because under OMP `process.execPath` is the
+OMP CLI itself.
+
 ### Simulated host-bridge and optional real smoke
 
 ```bash
