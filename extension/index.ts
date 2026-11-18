@@ -28,6 +28,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { chooseBuildScript, resolveScriptRuntime } from "../shared/delivery-runtime.mjs";
 import { redactSecrets } from "../shared/security.mjs";
 import { analyzeScreenshot } from "../shared/screenshot-analysis.mjs";
 
@@ -39,6 +40,8 @@ const DATA_ROOT = join(PACKAGE_ROOT, "data", "ui-ux-pro-max");
 const SCRIPTS_ROOT = join(PACKAGE_ROOT, "scripts");
 const QUALITY_SCRIPT = join(SCRIPTS_ROOT, "fix-ai-slop.mjs");
 const LAYOUT_SCRIPT = join(SCRIPTS_ROOT, "analyze-layout.mjs");
+// Never `process.execPath`: under omp that is the omp CLI, not a JS runtime.
+const SCRIPT_RUNTIME = resolveScriptRuntime() ?? "node";
 
 const AGENT_ROOT = join(HOME, ".omp", "agent");
 const STATE_FILE = join(AGENT_ROOT, "designer-state.json");
@@ -576,10 +579,11 @@ function projectBuildCheck(cwd: string): CheckResult {
   try {
     const parsed = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8")) as Record<string, unknown>;
     const scripts = asRecord(parsed.scripts);
-    if (typeof scripts.build !== "string") {
-      return { name: "build", ok: true, skipped: "no build script", output: "" };
+    const choice = chooseBuildScript(scripts);
+    if (!choice.script) {
+      return { name: "build", ok: true, skipped: choice.skipped, output: "" };
     }
-    return runProcess("build", "npm", ["run", "build"], cwd, 120_000);
+    return runProcess("build", "npm", ["run", choice.script], cwd, 120_000);
   } catch (error) {
     return { name: "build", ok: false, output: error instanceof Error ? error.message : String(error) };
   }
@@ -591,8 +595,8 @@ function deliveryChecks(cwd: string, userFacts = ""): CheckResult[] {
   }
   const factEnv: Record<string, string> = userFacts ? { DESIGNER_USER_FACTS: userFacts } : {};
   return [
-    runProcess("quality", process.execPath, [QUALITY_SCRIPT, "--check", "."], cwd, 45_000, factEnv),
-    runProcess("layout", process.execPath, [LAYOUT_SCRIPT, "."], cwd, 45_000),
+    runProcess("quality", SCRIPT_RUNTIME, [QUALITY_SCRIPT, "--check", "."], cwd, 45_000, factEnv),
+    runProcess("layout", SCRIPT_RUNTIME, [LAYOUT_SCRIPT, "."], cwd, 45_000),
     projectBuildCheck(cwd),
   ];
 }
@@ -655,7 +659,7 @@ function findScreenshots(cwd: string): string[] {
 
 function parseValidatorJson(script: string, cwd: string, userFacts = ""): Record<string, unknown> | null {
   const extraEnv: Record<string, string> = userFacts ? { DESIGNER_USER_FACTS: userFacts } : {};
-  const result = runProcess("validator-json", process.execPath, [script, "--json", "."], cwd, 45_000, extraEnv);
+  const result = runProcess("validator-json", SCRIPT_RUNTIME, [script, "--json", "."], cwd, 45_000, extraEnv);
   try {
     return JSON.parse(result.output) as Record<string, unknown>;
   } catch {
@@ -766,7 +770,7 @@ function tasteReview(cwd: string, userFacts = ""): TasteItem[] {
     const reviewCommand = process.env.DESIGNER_REVIEW_CMD;
     const reviewRun = reviewCommand
       ? runProcess("visual-review", "sh", ["-c", reviewCommand], cwd, 300_000)
-      : runProcess("visual-review", process.execPath, [
+      : runProcess("visual-review", SCRIPT_RUNTIME, [
           join(SCRIPTS_ROOT, "design-review-cli.mjs"), "--target", ".", "--model", reviewModel, "--max-time", "240",
         ], cwd, 320_000);
     if (reviewRun.ok) {
